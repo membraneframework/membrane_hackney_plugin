@@ -1,9 +1,9 @@
-# Membrane Multimedia Framework: HTTPoison Element
+# Membrane Multimedia Framework: Hackney Element
 
-[![Build Status](https://travis-ci.com/membraneframework/membrane-element-httpoison.svg?branch=master)](https://travis-ci.com/membraneframework/membrane-element-httpoison)
+[![Build Status](https://travis-ci.com/membraneframework/membrane-element-hackney.svg?branch=master)](https://travis-ci.com/membraneframework/membrane-element-hackney)
 
 This package provides elements that can be used to read files over HTTP using
-[HTTPoison](https://github.com/edgurgel/httpoison) library.
+[Hackney](https://github.com/benoitc/hackney) library.
 
 It is part of [Membrane Multimedia Framework](https://membraneframework.org).
 
@@ -12,7 +12,7 @@ It is part of [Membrane Multimedia Framework](https://membraneframework.org).
 Add the following line to your `deps` in `mix.exs`.  Run `mix deps.get`.
 
 ```elixir
-{:membrane_element_httpoison, "~> 0.1"}
+{:membrane_element_hackney, "~> 0.1"}
 ```
 
 ## Sample usage
@@ -20,20 +20,20 @@ Add the following line to your `deps` in `mix.exs`.  Run `mix deps.get`.
 This should get you a kitten from imgur and save as `kitty.jpg`.
 
 ```elixir
-defmodule HTTPoison.Pipeline do
+defmodule Hackney.Pipeline do
   use Membrane.Pipeline
   alias Pipeline.Spec
   alias Membrane.Element.File
-  alias Membrane.Element.HTTPoison
+  alias Membrane.Element.Hackney
 
   @impl true
   def handle_init(_) do
     children = [
-      httpoison_src: %HTTPoison.Source{location: "http://i.imgur.com/z4d4kWk.jpg"},
+      hackney_src: %Hackney.Source{location: "http://i.imgur.com/z4d4kWk.jpg"},
       file_sink: %File.Sink{location: "kitty.jpg"},
     ]
     links = %{
-      {:httpoison_src, :source} => {:file_sink, :sink}
+      {:hackney_src, :source} => {:file_sink, :sink}
     }
 
     {{:ok, %Spec{children: children, links: links}}, %{}}

@@ -1,4 +1,4 @@
-defmodule Membrane.Element.HTTPoison do
+defmodule Membrane.Element.Hackney do
   @moduledoc false
   use Application
 
@@ -7,7 +7,7 @@ defmodule Membrane.Element.HTTPoison do
 
     children = []
 
-    opts = [strategy: :one_for_one, name: Membrane.Element.HTTPoison]
+    opts = [strategy: :one_for_one, name: Membrane.Element.Hackney]
     Supervisor.start_link(children, opts)
   end
 end

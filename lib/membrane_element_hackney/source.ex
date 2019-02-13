@@ -7,7 +7,7 @@ defmodule Membrane.Element.Hackney.Source do
   See the `t:t/0` for the available configuration options.
   """
   use Membrane.Element.Base.Source
-  use Membrane.Log, tags: __MODULE__
+  use Membrane.Log, tags: :membrane_element_hackney
   alias Membrane.{Buffer, Event, Element, Time}
   import Mockery.Macro
 
@@ -53,7 +53,7 @@ defmodule Membrane.Element.Hackney.Source do
                 description: """
                 Delay before another retry after error.
                 """,
-                default: 200 |> Time.millisecond()
+                default: 1 |> Time.second()
               ],
               is_live: [
                 type: :boolean,
@@ -139,7 +139,8 @@ defmodule Membrane.Element.Hackney.Source do
         {:hackney_response, id, {:status, code, desc}},
         _ctx,
         %{async_response: id} = state
-      ) when code in [200, 206] do
+      )
+      when code in [200, 206] do
     debug("Hackney: Got #{code} #{desc}")
     {{:ok, redemand: :output}, %{state | streaming: false, retries: 0}}
   end
@@ -155,7 +156,7 @@ defmodule Membrane.Element.Hackney.Source do
     If you want to follow add `follow_redirect: true` to :poison_opts
     """)
 
-    retry({:httpoison, :redirect}, state |> close_request())
+    retry({:hackney, :redirect}, state |> close_request())
   end
 
   def handle_other(
@@ -164,7 +165,7 @@ defmodule Membrane.Element.Hackney.Source do
         %{async_response: id} = state
       ) do
     warn("Hackney: Got 416 Invalid Range (pos_counter is #{inspect(state.pos_counter)})")
-    retry({:httpoison, :invalid_range}, state |> close_request())
+    retry({:hackney, :invalid_range}, state |> close_request())
   end
 
   def handle_other(
@@ -215,7 +216,7 @@ defmodule Membrane.Element.Hackney.Source do
   def handle_other({:hackney_response, id, {:error, reason}}, _ctx, %{async_response: id} = state) do
     warn("Hackney error #{inspect(reason)}")
 
-    retry({:httpoison, reason}, state |> close_request())
+    retry({:hackney, reason}, state |> close_request())
   end
 
   def handle_other(
@@ -259,7 +260,7 @@ defmodule Membrane.Element.Hackney.Source do
       location: location,
       body: body,
       headers: headers,
-      poison_opts: opts,
+      hackney_opts: opts,
       pos_counter: pos,
       is_live: is_live
     } = state
@@ -279,7 +280,13 @@ defmodule Membrane.Element.Hackney.Source do
            mockable(:hackney).request(method, location, headers, body, opts) do
       {:ok, %{state | async_response: async_response, streaming: true}}
     else
-      {:error, reason} -> retry({:httpoison, reason}, state)
+      {:error, reason} ->
+        warn("""
+        Error while making a request #{inspect({method, location, body, headers, opts})},
+        reason #{inspect(reason)}
+        """)
+
+        retry({:hackney, reason}, state)
     end
   end
 
