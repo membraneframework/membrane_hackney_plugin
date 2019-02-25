@@ -51,7 +51,7 @@ defmodule Membrane.Element.Hackney.Source do
               retry_delay: [
                 type: :time,
                 description: """
-                Delay before another retry after error.
+                Delay between reconnection attempts in case of connection error.
                 """,
                 default: 1 |> Time.second()
               ],
@@ -117,7 +117,8 @@ defmodule Membrane.Element.Hackney.Source do
       {:error, reason} ->
         warn("Hackney.stream_next/1 error: #{inspect(reason)}")
 
-        # Retry without delay - we will either sucessfully reconnect
+        # Error here is rather caused by library error,
+        # so we retry without delay - we will either sucessfully reconnect
         # or will get an error resulting in retry with delay
         retry({:stream_next, reason}, state |> close_request(), false)
     end
