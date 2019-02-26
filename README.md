@@ -1,5 +1,7 @@
 # Membrane Multimedia Framework: Hackney Element
 
+[![Hex.pm](https://img.shields.io/hexpm/v/membrane_element_hackney.svg)](https://hex.pm/packages/membrane_element_hackney)
+[![API Docs](https://img.shields.io/badge/api-docs-yellow.svg?style=flat)](https://hexdocs.pm/membrane_element_hackney/)
 [![Build Status](https://travis-ci.com/membraneframework/membrane-element-hackney.svg?branch=master)](https://travis-ci.com/membraneframework/membrane-element-hackney)
 
 This package provides elements that can be used to read files over HTTP using
