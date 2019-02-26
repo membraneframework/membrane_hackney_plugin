@@ -296,7 +296,7 @@ defmodule Membrane.Element.Hackney.Source do
   end
 
   defp close_request(%{async_response: resp} = state) do
-    mockable(:hackney).close(resp)
+    _ = mockable(:hackney).close(resp)
     %{state | async_response: nil, streaming: false}
   end
 end
