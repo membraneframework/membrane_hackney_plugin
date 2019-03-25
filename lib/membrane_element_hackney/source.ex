@@ -11,7 +11,7 @@ defmodule Membrane.Element.Hackney.Source do
   alias Membrane.{Buffer, Event, Element, Time}
   import Mockery.Macro
 
-  def_output_pads output: [caps: :any]
+  def_output_pad :output, caps: :any
 
   def_options location: [
                 type: :string,
