@@ -7,7 +7,7 @@ defmodule Membrane.Element.Hackney.Source do
   See the `t:t/0` for the available configuration options.
   """
   use Membrane.Element.Base.Source
-  use Membrane.Log, tags: :membrane_element_hackney
+  use Membrane.Log, tags: :membrane_hackney_source
   alias Membrane.{Buffer, Event, Element, Time}
   import Mockery.Macro
 
