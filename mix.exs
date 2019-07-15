@@ -16,7 +16,7 @@ defmodule Membrane.Element.Hackney.Mixfile do
       name: "Membrane Element: Hackney",
       source_url: @github_url,
       docs: docs(),
-      dialyzer: [flags: [:error_handling, :underspecs, :unmatched_returns]],
+      dialyzer: [flags: [:error_handling, :underspecs]],
       deps: deps()
     ]
   end
@@ -52,8 +52,8 @@ defmodule Membrane.Element.Hackney.Mixfile do
 
   defp deps do
     [
-      {:ex_doc, "~> 0.19", only: :dev, runtime: false},
-      {:mockery, "~> 2.1", runtime: false},
+      {:ex_doc, "~> 0.20", only: :dev, runtime: false},
+      {:mockery, "~> 2.3", runtime: false},
       {:membrane_core, "~> 0.3.0"},
       {:dialyxir, "~> 1.0.0-rc.4", only: [:dev], runtime: false},
       {:hackney, "~> 1.15"}
