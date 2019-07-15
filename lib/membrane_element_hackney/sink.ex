@@ -33,7 +33,12 @@ defmodule Membrane.Element.Hackney.Sink do
                 default: []
               ]
 
-  @chunk_size 1024
+  @demand_size 1024
+
+  defmodule Response do
+    @enforce_keys [:status, :headers, :body]
+    defstruct @enforce_keys
+  end
 
   @impl true
   def handle_init(opts) do
@@ -46,7 +51,7 @@ defmodule Membrane.Element.Hackney.Sink do
     {:ok, conn_ref} =
       :hackney.request(state.method, state.location, state.headers, :stream, state.hackney_opts)
 
-    {{:ok, demand: {:input, @chunk_size}}, %{state | conn_ref: conn_ref}}
+    {{:ok, demand: {:input, @demand_size}}, %{state | conn_ref: conn_ref}}
   end
 
   @impl true
@@ -59,7 +64,7 @@ defmodule Membrane.Element.Hackney.Sink do
   @impl true
   def handle_write(:input, %Buffer{payload: payload}, _ctx, state) do
     :hackney.send_body(state.conn_ref, payload)
-    {{:ok, demand: {:input, @chunk_size}}, state}
+    {{:ok, demand: {:input, @demand_size}}, state}
   end
 
   @impl true
@@ -67,7 +72,7 @@ defmodule Membrane.Element.Hackney.Sink do
     {:ok, status, headers, conn_ref} = :hackney.start_response(conn_ref)
     {:ok, body} = :hackney.body(conn_ref)
 
-    response_notification = {:http_response, status, headers, body}
+    response_notification = %__MODULE__.Response{status: status, headers: headers, body: body}
     {{:ok, notify: response_notification, notify: {:end_of_stream, :input}}, state}
   end
 
