@@ -12,7 +12,7 @@ It is part of [Membrane Multimedia Framework](https://membraneframework.org).
 Add the following line to your `deps` in `mix.exs`.  Run `mix deps.get`.
 
 ```elixir
-{:membrane_element_hackney, "~> 0.1"}
+{:membrane_element_hackney, "~> 0.2"}
 ```
 
 ## Sample usage
@@ -40,6 +40,10 @@ defmodule Hackney.Pipeline do
   end
 end
 ```
+
+## Sponsors
+
+The development of this element was sponsored by [Abridge AI, Inc.](https://abridge.com)
 
 ## Copyright and License
 
