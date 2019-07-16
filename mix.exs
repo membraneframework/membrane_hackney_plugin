@@ -7,17 +7,22 @@ defmodule Membrane.Element.Hackney.Mixfile do
   def project do
     [
       app: :membrane_element_hackney,
-      compilers: Mix.compilers(),
       version: @version,
       elixir: "~> 1.7",
       elixirc_paths: elixirc_paths(Mix.env()),
+      deps: deps(),
+
+      # hex
       description: "Membrane Multimedia Framework (Hackney Element)",
       package: package(),
+
+      # docs
       name: "Membrane Element: Hackney",
       source_url: @github_url,
       docs: docs(),
-      dialyzer: [flags: [:error_handling, :underspecs]],
-      deps: deps()
+
+      # others
+      dialyzer: [flags: [:error_handling, :underspecs]]
     ]
   end
 
@@ -31,11 +36,13 @@ defmodule Membrane.Element.Hackney.Mixfile do
   defp elixirc_paths(:test), do: ["lib", "spec/support"]
   defp elixirc_paths(_), do: ["lib"]
 
-  defp docs do
+  defp deps do
     [
-      main: "readme",
-      extras: ["README.md"],
-      source_ref: "v#{@version}"
+      {:ex_doc, "~> 0.20", only: :dev, runtime: false},
+      {:mockery, "~> 2.3", runtime: false},
+      {:membrane_core, "~> 0.3.0"},
+      {:dialyxir, "~> 1.0.0-rc.4", only: [:dev], runtime: false},
+      {:hackney, "~> 1.15"}
     ]
   end
 
@@ -50,13 +57,25 @@ defmodule Membrane.Element.Hackney.Mixfile do
     ]
   end
 
-  defp deps do
+  defp docs do
     [
-      {:ex_doc, "~> 0.20", only: :dev, runtime: false},
-      {:mockery, "~> 2.3", runtime: false},
-      {:membrane_core, "~> 0.3.0"},
-      {:dialyxir, "~> 1.0.0-rc.4", only: [:dev], runtime: false},
-      {:hackney, "~> 1.15"}
+      main: "readme",
+      extras: ["README.md"],
+      source_ref: "v#{@version}",
+      nest_modules_by_prefix: [
+        Membrane.Element.Hackney
+      ],
+      before_closing_head_tag: &sidebar_fix/1
     ]
+  end
+
+  defp sidebar_fix(_) do
+    """
+    <style type="text/css">
+    .sidebar div.sidebar-header {
+      margin: 15px;
+    }
+    </style>
+    """
   end
 end

@@ -37,6 +37,16 @@ defmodule Membrane.Element.Hackney.Sink do
   @demand_size 1024
 
   defmodule Response do
+    @moduledoc """
+    Struct containing HTTP response sent to pipeline via notification after the upload is finished.
+    """
+
+    @type t :: %__MODULE__{
+            status: non_neg_integer(),
+            headers: [{String.t(), String.t()}],
+            body: String.t()
+          }
+
     @enforce_keys [:status, :headers, :body]
     defstruct @enforce_keys
   end

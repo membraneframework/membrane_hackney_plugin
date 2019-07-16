@@ -17,7 +17,9 @@ Add the following line to your `deps` in `mix.exs`.  Run `mix deps.get`.
 
 ## Sample usage
 
-This should get you a kitten from imgur and save as `kitty.jpg`.
+### `Membrane.Element.Hackney.Source`
+
+This pipeline should get you a kitten from imgur and save as `kitty.jpg`. To run it you need [`:membrane_element_file`](https://github.com/membraneframework/membrane-element-file) in your project's dependencies.
 
 ```elixir
 defmodule Hackney.Pipeline do
@@ -39,6 +41,62 @@ defmodule Hackney.Pipeline do
     {{:ok, %Spec{children: children, links: links}}, %{}}
   end
 end
+```
+
+### `Membrane.Element.Hackney.Sink`
+
+The following pipeline is an example of file upload - it requires [Goth](https://github.com/peburrows/goth) library with
+properly configurated credentials for Google Cloud and [`:membrane_element_file`](https://github.com/membraneframework/membrane-element-file)
+
+```elixir
+defmodule UploadPipeline do
+  use Membrane.Pipeline
+
+  alias Membrane.Pipeline.Spec
+  alias Membrane.Element.{File, Hackney}
+
+  @impl true
+  def handle_init([bucket, name]) do
+    children = [
+      src: %File.Source{location: "sample.flac"},
+      sink: %Hackney.Sink{
+        method: :post,
+        location: build_uri(bucket, name),
+        headers: [auth_header(), {"content-type", "audio/flac"}]
+      }
+    ]
+
+    links = %{
+      {:src, :output} => {:sink, :input}
+    }
+
+    {{:ok, %Spec{children: children, links: links}}, %{}}
+  end
+
+  @impl true
+  def handle_notification(%Hackney.Sink.Response{} = response, source, state) do
+    IO.inspect({source, response})
+    {:ok, state}
+  end
+
+  def handle_notification(_notification, _source, state) do
+    {:ok, state}
+  end
+
+  @api_scope "https://www.googleapis.com/auth/devstorage.read_write"
+  defp auth_header do
+    {:ok, token} = Goth.Token.for_scope(@api_scope)
+    {"Authorization", "#{token.type} #{token.token}"}
+  end
+
+  defp build_uri(bucket, name) do
+    "https://www.googleapis.com/upload/storage/v1/b/#{bucket}/o?" <>
+      URI.encode_query(uploadType: "media", name: name)
+  end
+end
+
+{:ok, pid} = UploadPipeline.start(["some_bucket", "uploaded_file_name.flac"])
+UploadPipeline.play(pid)
 ```
 
 ## Sponsors
