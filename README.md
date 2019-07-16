@@ -22,7 +22,7 @@ Add the following line to your `deps` in `mix.exs`.  Run `mix deps.get`.
 This pipeline should get you a kitten from imgur and save as `kitty.jpg`. To run it you need [`:membrane_element_file`](https://github.com/membraneframework/membrane-element-file) in your project's dependencies.
 
 ```elixir
-defmodule Hackney.Pipeline do
+defmodule DownloadPipeline do
   use Membrane.Pipeline
   alias Pipeline.Spec
   alias Membrane.Element.File
@@ -41,6 +41,9 @@ defmodule Hackney.Pipeline do
     {{:ok, %Spec{children: children, links: links}}, %{}}
   end
 end
+
+{:ok, pid} = DownloadPipeline.start(nil)
+DownloadPipeline.play(pid)
 ```
 
 ### `Membrane.Element.Hackney.Sink`
@@ -74,18 +77,17 @@ defmodule UploadPipeline do
   end
 
   @impl true
-  def handle_notification(%Hackney.Sink.Response{} = response, source, state) do
-    IO.inspect({source, response})
+  def handle_notification(%Hackney.Sink.Response{} = response, element_name, state) do
+    IO.inspect({element_name, response})
     {:ok, state}
   end
 
-  def handle_notification(_notification, _source, state) do
+  def handle_notification(_notification, _element_name, state) do
     {:ok, state}
   end
 
-  @api_scope "https://www.googleapis.com/auth/devstorage.read_write"
   defp auth_header do
-    {:ok, token} = Goth.Token.for_scope(@api_scope)
+    {:ok, token} = Goth.Token.for_scope("https://www.googleapis.com/auth/devstorage.read_write")
     {"Authorization", "#{token.type} #{token.token}"}
   end
 
