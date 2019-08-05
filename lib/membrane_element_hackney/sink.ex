@@ -2,7 +2,7 @@ defmodule Membrane.Element.Hackney.Sink do
   @moduledoc """
   An element uploading data over HTTP(S) based on Hackney
   """
-  use Membrane.Element.Base.Sink
+  use Membrane.Sink
   use Membrane.Log, tags: :membrane_hackney_sink
   alias Membrane.{Buffer, Event}
   import Mockery.Macro
