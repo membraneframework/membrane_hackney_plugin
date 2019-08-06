@@ -1,6 +1,6 @@
 # Membrane Multimedia Framework: Hackney Element
 
-[![Build Status](https://travis-ci.com/membraneframework/membrane-element-hackney.svg?branch=master)](https://travis-ci.com/membraneframework/membrane-element-hackney)
+[![CircleCI](https://circleci.com/gh/membraneframework/membrane-element-hackney.svg?style=svg)](https://circleci.com/gh/membraneframework/membrane-element-hackney) 
 
 This package provides elements that can be used to read files over HTTP using
 [Hackney](https://github.com/benoitc/hackney) library.
