@@ -1,7 +1,7 @@
 defmodule Membrane.Element.Hackney.Mixfile do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.2.1"
   @github_url "http://github.com/membraneframework/membrane-element-hackney"
 
   def project do
@@ -40,7 +40,7 @@ defmodule Membrane.Element.Hackney.Mixfile do
     [
       {:ex_doc, "~> 0.20", only: :dev, runtime: false},
       {:mockery, "~> 2.3", runtime: false},
-      {:membrane_core, github: "membraneframework/membrane-core", branch: "master"},
+      {:membrane_core, "~> 0.4.0"},
       {:dialyxir, "~> 1.0.0-rc.4", only: [:dev], runtime: false},
       {:hackney, "~> 1.15"}
     ]

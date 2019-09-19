@@ -8,7 +8,7 @@ defmodule Membrane.Element.Hackney.Source do
   """
   use Membrane.Source
   use Membrane.Log, tags: :membrane_hackney_source
-  alias Membrane.{Buffer, Event, Element, Time}
+  alias Membrane.{Buffer, Element, Time}
   import Mockery.Macro
 
   def_output_pad :output, caps: :any
@@ -211,7 +211,7 @@ defmodule Membrane.Element.Hackney.Source do
   def handle_other({:hackney_response, id, :done}, _ctx, %{async_response: id} = state) do
     info("Hackney EOS")
     new_state = %{state | streaming: false, async_response: nil}
-    {{:ok, event: {:output, %Event.EndOfStream{}}}, new_state}
+    {{:ok, end_of_stream: :output}, new_state}
   end
 
   def handle_other({:hackney_response, id, {:error, reason}}, _ctx, %{async_response: id} = state) do

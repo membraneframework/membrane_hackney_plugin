@@ -2,7 +2,7 @@ defmodule Membrane.Element.Hackney.SinkTest do
   use ExUnit.Case, async: true
   use Mockery
 
-  alias Membrane.{Buffer, Event}
+  alias Membrane.Buffer
 
   @module Membrane.Element.Hackney.Sink
 
@@ -73,8 +73,7 @@ defmodule Membrane.Element.Hackney.SinkTest do
       mock(:hackney, [start_response: 1], {:ok, status, headers, @mock_conn_ref})
       mock(:hackney, [body: 1], {:ok, body})
 
-      assert {{:ok, actions}, ^state} =
-               @module.handle_event(:input, %Event.EndOfStream{}, %{}, state)
+      assert {{:ok, actions}, ^state} = @module.handle_end_of_stream(:input, %{}, state)
 
       assert [response, eos] = actions |> Keyword.get_values(:notify)
       assert response == %@module.Response{status: status, headers: headers, body: body}

@@ -4,7 +4,7 @@ defmodule Membrane.Element.Hackney.Sink do
   """
   use Membrane.Sink
   use Membrane.Log, tags: :membrane_hackney_sink
-  alias Membrane.{Buffer, Event}
+  alias Membrane.Buffer
   import Mockery.Macro
 
   def_input_pad :input, caps: :any, demand_unit: :bytes
@@ -85,16 +85,11 @@ defmodule Membrane.Element.Hackney.Sink do
   end
 
   @impl true
-  def handle_event(:input, %Event.EndOfStream{}, _ctx, %{conn_ref: conn_ref} = state) do
+  def handle_end_of_stream(:input, _ctx, %{conn_ref: conn_ref} = state) do
     {:ok, status, headers, conn_ref} = mockable(:hackney).start_response(conn_ref)
     {:ok, body} = mockable(:hackney).body(conn_ref)
 
     response_notification = %__MODULE__.Response{status: status, headers: headers, body: body}
     {{:ok, notify: response_notification, notify: {:end_of_stream, :input}}, state}
-  end
-
-  @impl true
-  def handle_event(pad, event, ctx, state) do
-    super(pad, event, ctx, state)
   end
 end

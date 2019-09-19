@@ -21,7 +21,7 @@ defmodule Membrane.Element.Hackney.SourceTest do
     pos_counter: 0
   }
 
-  @ctx_other_pl %Ctx.Other{playback_state: :playing, pads: %{}}
+  @ctx_other_pl %Ctx.Other{playback_state: :playing, pads: %{}, clock: nil, pipeline_clock: nil}
 
   def state_streaming(_) do
     state =
@@ -195,7 +195,7 @@ defmodule Membrane.Element.Hackney.SourceTest do
 
     test "async chunk when not playing should ignore the data", %{state_streaming: state} do
       msg = {:hackney_response, :mock_response, <<>>}
-      ctx = %Ctx.Other{playback_state: :prepared, pads: %{}}
+      ctx = Map.put(@ctx_other_pl, :playback_state, :prepared)
       assert {:ok, new_state} = @module.handle_other(msg, ctx, state)
       assert new_state.streaming == false
     end
@@ -218,7 +218,7 @@ defmodule Membrane.Element.Hackney.SourceTest do
     } do
       msg = {:hackney_response, :mock_response, :done}
       assert {{:ok, actions}, new_state} = @module.handle_other(msg, @ctx_other_pl, state)
-      assert actions == [event: {:output, %Membrane.Event.EndOfStream{}}]
+      assert actions == [end_of_stream: :output]
       assert new_state.async_response == nil
       assert new_state.streaming == false
     end
