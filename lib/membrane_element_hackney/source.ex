@@ -88,7 +88,7 @@ defmodule Membrane.Element.Hackney.Source do
         state
       end
 
-    {:ok, state}
+    {:ok, %{state | retries: 0, pos_counter: 0}}
   end
 
   @impl true
