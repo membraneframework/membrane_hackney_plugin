@@ -16,6 +16,7 @@ defmodule Membrane.Element.Hackney.SinkTest do
       method: :post,
       headers: [],
       hackney_opts: [],
+      demand_size: 1024,
       conn_ref: nil
     }
   end
