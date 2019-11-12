@@ -32,9 +32,12 @@ defmodule Membrane.Element.Hackney.Sink do
                 description:
                   "Additional options for Hackney in format accepted by `:hackney.request/5`",
                 default: []
+              ],
+              demand_size: [
+                type: :integer,
+                description: "The size of the demand made after each write",
+                default: 1024
               ]
-
-  @demand_size 1024
 
   defmodule Response do
     @moduledoc """
@@ -68,7 +71,7 @@ defmodule Membrane.Element.Hackney.Sink do
         state.hackney_opts
       )
 
-    {{:ok, demand: {:input, @demand_size}}, %{state | conn_ref: conn_ref}}
+    {{:ok, demand: {:input, state.demand_size}}, %{state | conn_ref: conn_ref}}
   end
 
   @impl true
@@ -81,7 +84,7 @@ defmodule Membrane.Element.Hackney.Sink do
   @impl true
   def handle_write(:input, %Buffer{payload: payload}, _ctx, state) do
     mockable(:hackney).send_body(state.conn_ref, payload)
-    {{:ok, demand: {:input, @demand_size}}, state}
+    {{:ok, demand: {:input, state.demand_size}}, state}
   end
 
   @impl true
