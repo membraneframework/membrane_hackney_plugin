@@ -21,7 +21,13 @@ defmodule Membrane.Element.Hackney.SourceTest do
     pos_counter: 0
   }
 
-  @ctx_other_pl %Ctx.Other{playback_state: :playing, pads: %{}, clock: nil, parent_clock: nil}
+  @ctx_other_pl %Ctx.Other{
+    playback_state: :playing,
+    pads: %{},
+    clock: nil,
+    parent_clock: nil,
+    name: :source
+  }
 
   def state_streaming(_) do
     state =
