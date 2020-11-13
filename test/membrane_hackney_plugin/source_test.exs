@@ -1,10 +1,10 @@
-defmodule Membrane.Element.Hackney.SourceTest do
+defmodule Membrane.Hackney.SourceTest do
   @moduledoc false
   use ExUnit.Case, async: true
   use Mockery
   alias Membrane.Element.CallbackContext, as: Ctx
 
-  @module Membrane.Element.Hackney.Source
+  @module Membrane.Hackney.Source
 
   @default_state %{
     body: "",

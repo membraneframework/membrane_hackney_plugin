@@ -1,9 +1,10 @@
-# Membrane Multimedia Framework: Hackney Element
+# Membrane Hackney plugin
 
-[![CircleCI](https://circleci.com/gh/membraneframework/membrane-element-hackney.svg?style=svg)](https://circleci.com/gh/membraneframework/membrane-element-hackney) 
+[![Hex.pm](https://img.shields.io/hexpm/v/membrane_hackney_plugin.svg)](https://hex.pm/packages/membrane_hackney_plugin)
+[![API Docs](https://img.shields.io/badge/api-docs-yellow.svg?style=flat)](https://hexdocs.pm/membrane_hackney_plugin/)
+[![CircleCI](https://circleci.com/gh/membraneframework/membrane_hackney_plugin.svg?style=svg)](https://circleci.com/gh/membraneframework/membrane_hackney_plugin) 
 
-This package provides elements that can be used to read files over HTTP using
-[Hackney](https://github.com/benoitc/hackney) library.
+Plugin that can be used to read/write files over HTTP using [Hackney](https://github.com/benoitc/hackney) library.
 
 It is part of [Membrane Multimedia Framework](https://membraneframework.org).
 
@@ -12,56 +13,58 @@ It is part of [Membrane Multimedia Framework](https://membraneframework.org).
 Add the following line to your `deps` in `mix.exs`.  Run `mix deps.get`.
 
 ```elixir
-{:membrane_element_hackney, "~> 0.4.0"}
+{:membrane_hackney_plugin, "~> 0.4.0"}
 ```
 
 ## Sample usage
 
-### `Membrane.Element.Hackney.Source`
+### Membrane.Hackney.Source
 
-This pipeline should get you a kitten from imgur and save as `kitty.jpg`. To run it you need [`:membrane_element_file`](https://github.com/membraneframework/membrane-element-file) in your project's dependencies.
+This pipeline should get you a kitten from imgur and save as `kitty.jpg`. To run it you need 
+[`:membrane_file_plugin`](https://github.com/membraneframework/membrane_file_plugin) in your project's dependencies.
 
 ```elixir
 defmodule DownloadPipeline do
   use Membrane.Pipeline
-  alias Pipeline.Spec
-  alias Membrane.Element.File
-  alias Membrane.Element.Hackney
+  alias Membrane.{File, Hackney}
 
   @impl true
   def handle_init(_) do
     children = [
-      hackney_src: %Hackney.Source{location: "http://i.imgur.com/z4d4kWk.jpg"},
-      file_sink: %File.Sink{location: "kitty.jpg"},
+      source: %Hackney.Source{
+        location: "http://i.imgur.com/z4d4kWk.jpg",
+        hackney_opts: [follow_redirect: true]
+      },
+      sink: %File.Sink{location: "kitty.jpg"}
     ]
-    links = %{
-      {:hackney_src, :source} => {:file_sink, :sink}
-    }
 
-    {{:ok, %Spec{children: children, links: links}}, %{}}
+    links = [link(:source) |> to(:sink)]
+
+    spec = %ParentSpec{children: children, links: links}
+
+    {{:ok, spec: spec}, %{}}
   end
 end
 
-{:ok, pid} = DownloadPipeline.start(nil)
+{:ok, pid} = DownloadPipeline.start_link()
 DownloadPipeline.play(pid)
 ```
 
-### `Membrane.Element.Hackney.Sink`
+### Membrane.Hackney.Sink
 
 The following pipeline is an example of file upload - it requires [Goth](https://github.com/peburrows/goth) library with
-properly configurated credentials for Google Cloud and [`:membrane_element_file`](https://github.com/membraneframework/membrane-element-file)
+properly configured credentials for Google Cloud and [`:membrane_file_plugin`](https://github.com/membraneframework/membrane_file_plugin) in your project's dependencies.
 
 ```elixir
 defmodule UploadPipeline do
   use Membrane.Pipeline
 
-  alias Membrane.Pipeline.Spec
-  alias Membrane.Element.{File, Hackney}
+  alias Membrane.{File, Hackney}
 
   @impl true
   def handle_init([bucket, name]) do
     children = [
-      src: %File.Source{location: "sample.flac"},
+      source: %File.Source{location: "sample.flac"},
       sink: %Hackney.Sink{
         method: :post,
         location: build_uri(bucket, name),
@@ -69,20 +72,20 @@ defmodule UploadPipeline do
       }
     ]
 
-    links = %{
-      {:src, :output} => {:sink, :input}
-    }
+    links = [link(:source) |> to(:sink)]
 
-    {{:ok, %Spec{children: children, links: links}}, %{}}
+    spec = %ParentSpec{children: children, links: links}
+
+    {{:ok, spec: spec}, %{}}
   end
 
   @impl true
-  def handle_notification(%Hackney.Sink.Response{} = response, element_name, state) do
-    IO.inspect({element_name, response})
+  def handle_notification(%Hackney.Sink.Response{} = response, from, _ctx, state) do
+    IO.inspect({from, response})
     {:ok, state}
   end
 
-  def handle_notification(_notification, _element_name, state) do
+  def handle_notification(_notification, _from, _ctx, state) do
     {:ok, state}
   end
 
@@ -97,13 +100,13 @@ defmodule UploadPipeline do
   end
 end
 
-{:ok, pid} = UploadPipeline.start(["some_bucket", "uploaded_file_name.flac"])
+{:ok, pid} = UploadPipeline.start_link(["some_bucket", "uploaded_file_name.flac"])
 UploadPipeline.play(pid)
 ```
 
 ## Sponsors
 
-The development of this element was sponsored by [Abridge AI, Inc.](https://abridge.com)
+The development of this plugin was sponsored by [Abridge AI, Inc.](https://abridge.com)
 
 ## Copyright and License
 

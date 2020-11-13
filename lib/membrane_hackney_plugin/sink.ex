@@ -1,4 +1,4 @@
-defmodule Membrane.Element.Hackney.Sink do
+defmodule Membrane.Hackney.Sink do
   @moduledoc """
   An element uploading data over HTTP(S) based on Hackney
   """
