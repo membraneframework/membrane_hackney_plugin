@@ -4,7 +4,7 @@
 [![API Docs](https://img.shields.io/badge/api-docs-yellow.svg?style=flat)](https://hexdocs.pm/membrane_hackney_plugin/)
 [![CircleCI](https://circleci.com/gh/membraneframework/membrane_hackney_plugin.svg?style=svg)](https://circleci.com/gh/membraneframework/membrane_hackney_plugin) 
 
-Plugin that can be used to read/write files over HTTP using [Hackney] library.
+Plugin that can be used to read/write files over HTTP using [Hackney](https://github.com/benoitc/hackney) library.
 
 It is part of [Membrane Multimedia Framework](https://membraneframework.org).
 
@@ -21,7 +21,7 @@ Add the following line to your `deps` in `mix.exs`.  Run `mix deps.get`.
 ### Membrane.Hackney.Source
 
 This pipeline should get you a kitten from imgur and save as `kitty.jpg`. To run it you need 
-[Membrane File plugin] in your project's dependencies.
+[`:membrane_file_plugin`](https://github.com/membraneframework/membrane_file_plugin) in your project's dependencies.
 
 ```elixir
 defmodule DownloadPipeline do
@@ -53,7 +53,7 @@ DownloadPipeline.play(pid)
 ### Membrane.Hackney.Sink
 
 The following pipeline is an example of file upload - it requires [Goth](https://github.com/peburrows/goth) library with
-properly configured credentials for Google Cloud and [Membrane File plugin] in your project's dependencies.
+properly configured credentials for Google Cloud and [`:membrane_file_plugin`](https://github.com/membraneframework/membrane_file_plugin) in your project's dependencies.
 
 ```elixir
 defmodule UploadPipeline do
@@ -113,5 +113,3 @@ The development of this plugin was sponsored by [Abridge AI, Inc.](https://abrid
 Copyright 2018, [Software Mansion](https://swmansion.com/?utm_source=git&utm_medium=readme&utm_campaign=membrane)
 
 [![Software Mansion](https://logo.swmansion.com/logo?color=white&variant=desktop&width=200&tag=membrane-github)](https://swmansion.com/?utm_source=git&utm_medium=readme&utm_campaign=membrane)
-[Hackney]: (https://github.com/benoitc/hackney)
-[Membrane File plugin]: (https://github.com/membraneframework/membrane_file_plugin)
