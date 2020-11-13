@@ -53,7 +53,7 @@ defmodule Membrane.Hackney.Source do
                 description: """
                 Delay between reconnection attempts in case of connection error.
                 """,
-                default: 1 |> Time.second()
+                default: Time.second()
               ],
               is_live: [
                 type: :boolean,
