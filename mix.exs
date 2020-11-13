@@ -41,6 +41,7 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:mockery, "~> 2.3", runtime: false},
       {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false},
+      {:credo, "~> 1.4", only: :dev, runtime: false},
       {:hackney, "~> 1.16"}
     ]
   end

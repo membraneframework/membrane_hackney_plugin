@@ -111,9 +111,10 @@ defmodule Membrane.Hackney.Source do
   def handle_demand(:output, _size, _unit, _ctx, state) do
     debug("Hackney: requesting next chunk")
 
-    with :ok <- state.async_response |> mockable(:hackney).stream_next() do
-      {:ok, %{state | streaming: true}}
-    else
+    case state.async_response |> mockable(:hackney).stream_next() do
+      :ok ->
+        {:ok, %{state | streaming: true}}
+
       {:error, reason} ->
         warn("Hackney.stream_next/1 error: #{inspect(reason)}")
 
@@ -277,10 +278,10 @@ defmodule Membrane.Hackney.Source do
 
     debug("Hackney: connecting, request: #{inspect({method, location, body, headers, opts})}")
 
-    with {:ok, async_response} <-
-           mockable(:hackney).request(method, location, headers, body, opts) do
-      {:ok, %{state | async_response: async_response, streaming: true}}
-    else
+    case mockable(:hackney).request(method, location, headers, body, opts) do
+      {:ok, async_response} ->
+        {:ok, %{state | async_response: async_response, streaming: true}}
+
       {:error, reason} ->
         warn("""
         Error while making a request #{inspect({method, location, body, headers, opts})},
