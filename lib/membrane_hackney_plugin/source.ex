@@ -1,4 +1,4 @@
-defmodule Membrane.Element.Hackney.Source do
+defmodule Membrane.Hackney.Source do
   @moduledoc """
   This module provides a source element allowing you to receive data as a client
   using HTTP. It is based upon [Hackney](https://github.com/benoitc/hackney)

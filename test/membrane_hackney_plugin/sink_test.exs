@@ -4,7 +4,7 @@ defmodule Membrane.Element.Hackney.SinkTest do
 
   alias Membrane.Buffer
 
-  @module Membrane.Element.Hackney.Sink
+  @module Membrane.Hackney.Sink
 
   @mock_url "http://some_url.com/upload"
   @mock_conn_ref :conn_ref
