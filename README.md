@@ -4,7 +4,7 @@
 [![API Docs](https://img.shields.io/badge/api-docs-yellow.svg?style=flat)](https://hexdocs.pm/membrane_hackney_plugin/)
 [![CircleCI](https://circleci.com/gh/membraneframework/membrane_hackney_plugin.svg?style=svg)](https://circleci.com/gh/membraneframework/membrane_hackney_plugin) 
 
-HTTP sink and source based on Hackney [Hackney](https://github.com/benoitc/hackney) library.
+HTTP sink and source based on the [Hackney](https://github.com/benoitc/hackney) library.
 
 It is part of [Membrane Multimedia Framework](https://membraneframework.org).
 
