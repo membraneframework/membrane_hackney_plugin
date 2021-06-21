@@ -1,7 +1,7 @@
 defmodule Membrane.Hackney.Plugin.Mixfile do
   use Mix.Project
 
-  @version "0.4.0"
+  @version "0.5.0"
   @github_url "http://github.com/membraneframework/membrane_hackney_plugin"
 
   def project do
@@ -37,7 +37,7 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
 
   defp deps do
     [
-      {:membrane_core, "~> 0.6.0"},
+      {:membrane_core, "~> 0.7.0"},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:mockery, "~> 2.3", runtime: false},
       {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false},
