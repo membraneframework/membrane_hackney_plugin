@@ -129,9 +129,7 @@ defmodule Membrane.Hackney.Source do
   def handle_other({:hackney_response, msg_id, msg}, _ctx, %{async_response: id} = state)
       when msg_id != id do
     warn(
-      "Ignoring message #{inspect(msg)} because it does not match current response id: #{
-        inspect(id)
-      }"
+      "Ignoring message #{inspect(msg)} because it does not match current response id: #{inspect(id)}"
     )
 
     {:ok, state}
