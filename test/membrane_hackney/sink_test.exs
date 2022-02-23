@@ -84,7 +84,7 @@ defmodule Membrane.Element.Hackney.SinkTest do
     test "others" do
       mock_event = :event
       state = playing_state()
-      assert {:ok, ^state} = @module.handle_event(:input, mock_event, %{}, state)
+      assert @module.handle_event(:input, mock_event, %{}, state) == {:ok, state}
     end
   end
 end
