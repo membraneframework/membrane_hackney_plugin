@@ -60,7 +60,7 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
   defp docs do
     [
       main: "readme",
-      extras: ["README.md", "LICENSE"],
+      extras: ["README.md", LICENSE: [title: "License"]],
       formatters: ["html"],
       source_ref: "v#{@version}",
       nest_modules_by_prefix: [
