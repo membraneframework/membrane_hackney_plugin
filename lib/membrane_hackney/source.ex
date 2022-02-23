@@ -7,9 +7,12 @@ defmodule Membrane.Hackney.Source do
   See the `t:t/0` for the available configuration options.
   """
   use Membrane.Source
-  use Membrane.Log, tags: :membrane_hackney_source
-  alias Membrane.{Buffer, Element, Time}
+
   import Mockery.Macro
+
+  alias Membrane.{Buffer, Element, Time}
+
+  require Membrane.Logger
 
   def_output_pad :output, caps: :any
 
@@ -109,14 +112,14 @@ defmodule Membrane.Hackney.Source do
   end
 
   def handle_demand(:output, _size, _unit, _ctx, state) do
-    debug("Hackney: requesting next chunk")
+    Membrane.Logger.debug("Hackney: requesting next chunk")
 
     case state.async_response |> mockable(:hackney).stream_next() do
       :ok ->
         {:ok, %{state | streaming: true}}
 
       {:error, reason} ->
-        warn("Hackney.stream_next/1 error: #{inspect(reason)}")
+        Membrane.Logger.warn("Hackney.stream_next/1 error: #{inspect(reason)}")
 
         # Error here is rather caused by library error,
         # so we retry without delay - we will either sucessfully reconnect
@@ -128,7 +131,7 @@ defmodule Membrane.Hackney.Source do
   @impl true
   def handle_other({:hackney_response, msg_id, msg}, _ctx, %{async_response: id} = state)
       when msg_id != id do
-    warn(
+    Membrane.Logger.warn(
       "Ignoring message #{inspect(msg)} because it does not match current response id: #{inspect(id)}"
     )
 
@@ -141,17 +144,17 @@ defmodule Membrane.Hackney.Source do
         %{async_response: id} = state
       )
       when code in [200, 206] do
-    debug("Hackney: Got #{code} #{desc}")
+    Membrane.Logger.debug("Hackney: Got #{code} #{desc}")
     {{:ok, redemand: :output}, %{state | streaming: false, retries: 0}}
   end
 
   def handle_other(
-        {:hackney_response, id, {:status, code, _}},
+        {:hackney_response, id, {:status, code, _data}},
         _ctx,
         %{async_response: id} = state
       )
       when code in [301, 302] do
-    warn("""
+    Membrane.Logger.warn("""
     Got #{inspect(code)} status indicating redirection.
     If you want to follow add `follow_redirect: true` to :poison_opts
     """)
@@ -160,20 +163,23 @@ defmodule Membrane.Hackney.Source do
   end
 
   def handle_other(
-        {:hackney_response, id, {:status, 416, _}},
+        {:hackney_response, id, {:status, 416, _data}},
         _ctx,
         %{async_response: id} = state
       ) do
-    warn("Hackney: Got 416 Invalid Range (pos_counter is #{inspect(state.pos_counter)})")
+    Membrane.Logger.warn(
+      "Hackney: Got 416 Invalid Range (pos_counter is #{inspect(state.pos_counter)})"
+    )
+
     retry({:hackney, :invalid_range}, state |> close_request())
   end
 
   def handle_other(
-        {:hackney_response, id, {:status, code, _}},
+        {:hackney_response, id, {:status, code, _data}},
         _ctx,
         %{async_response: id} = state
       ) do
-    warn("Hackney: Got unexpected status code #{code}")
+    Membrane.Logger.warn("Hackney: Got unexpected status code #{code}")
     retry({:http_code, code}, state |> close_request())
   end
 
@@ -182,7 +188,7 @@ defmodule Membrane.Hackney.Source do
         _ctx,
         %{async_response: id} = state
       ) do
-    debug("Hackney: Got headers #{inspect(headers)}")
+    Membrane.Logger.debug("Hackney: Got headers #{inspect(headers)}")
 
     {{:ok, redemand: :output}, %{state | streaming: false}}
   end
@@ -208,13 +214,13 @@ defmodule Membrane.Hackney.Source do
   end
 
   def handle_other({:hackney_response, id, :done}, _ctx, %{async_response: id} = state) do
-    info("Hackney EOS")
+    Membrane.Logger.info("Hackney EOS")
     new_state = %{state | streaming: false, async_response: nil}
     {{:ok, end_of_stream: :output}, new_state}
   end
 
   def handle_other({:hackney_response, id, {:error, reason}}, _ctx, %{async_response: id} = state) do
-    warn("Hackney error #{inspect(reason)}")
+    Membrane.Logger.warn("Hackney error #{inspect(reason)}")
 
     retry({:hackney, reason}, state |> close_request())
   end
@@ -225,7 +231,7 @@ defmodule Membrane.Hackney.Source do
         %{async_response: id} = state
       )
       when redirect in [:redirect, :see_other] do
-    debug("Hackney: redirecting to #{new_location}")
+    Membrane.Logger.debug("Hackney: redirecting to #{new_location}")
 
     %{state | location: new_location, streaming: false}
     |> close_request()
@@ -274,14 +280,16 @@ defmodule Membrane.Hackney.Source do
         headers
       end
 
-    debug("Hackney: connecting, request: #{inspect({method, location, body, headers, opts})}")
+    Membrane.Logger.debug(
+      "Hackney: connecting, request: #{inspect({method, location, body, headers, opts})}"
+    )
 
     case mockable(:hackney).request(method, location, headers, body, opts) do
       {:ok, async_response} ->
         {:ok, %{state | async_response: async_response, streaming: true}}
 
       {:error, reason} ->
-        warn("""
+        Membrane.Logger.warn("""
         Error while making a request #{inspect({method, location, body, headers, opts})},
         reason #{inspect(reason)}
         """)
@@ -295,7 +303,7 @@ defmodule Membrane.Hackney.Source do
   end
 
   defp close_request(%{async_response: resp} = state) do
-    _ = mockable(:hackney).close(resp)
+    _result = mockable(:hackney).close(resp)
     %{state | async_response: nil, streaming: false}
   end
 end

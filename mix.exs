@@ -1,14 +1,14 @@
 defmodule Membrane.Hackney.Plugin.Mixfile do
   use Mix.Project
 
-  @version "0.6.0"
+  @version "0.7.0"
   @github_url "http://github.com/membraneframework/membrane_hackney_plugin"
 
   def project do
     [
       app: :membrane_hackney_plugin,
       version: @version,
-      elixir: "~> 1.10",
+      elixir: "~> 1.12",
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
 
@@ -33,23 +33,23 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
   end
 
   defp elixirc_paths(:test), do: ["lib", "spec/support"]
-  defp elixirc_paths(_), do: ["lib"]
+  defp elixirc_paths(_env), do: ["lib"]
 
   defp deps do
     [
-      {:membrane_core, "~> 0.8.0"},
-      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
+      {:membrane_core, "~> 0.9.0"},
+      {:hackney, "~> 1.16"},
       {:mockery, "~> 2.3", runtime: false},
-      {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false},
-      {:credo, "~> 1.4", only: :dev, runtime: false},
-      {:hackney, "~> 1.16"}
+      {:ex_doc, "~> 0.28", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.1", only: :dev, runtime: false},
+      {:credo, "~> 1.6", only: :dev, runtime: false}
     ]
   end
 
   defp package do
     [
       maintainers: ["Membrane Team"],
-      licenses: ["Apache 2.0"],
+      licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @github_url,
         "Membrane Framework Homepage" => "https://membraneframework.org"
@@ -60,22 +60,12 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
   defp docs do
     [
       main: "readme",
-      extras: ["README.md"],
+      extras: ["README.md", LICENSE: [title: "License"]],
+      formatters: ["html"],
       source_ref: "v#{@version}",
       nest_modules_by_prefix: [
         Membrane.Hackney
-      ],
-      before_closing_head_tag: &sidebar_fix/1
+      ]
     ]
-  end
-
-  defp sidebar_fix(_) do
-    """
-    <style type="text/css">
-    .sidebar div.sidebar-header {
-      margin: 15px;
-    }
-    </style>
-    """
   end
 end

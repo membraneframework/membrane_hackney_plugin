@@ -15,7 +15,7 @@ defmodule Membrane.Hackney.SourceTest do
     hackney_opts: [],
     retries: 0,
     max_retries: 0,
-    retry_delay: 1 |> Membrane.Time.millisecond(),
+    retry_delay: Membrane.Time.millisecond(),
     async_response: nil,
     streaming: false,
     pos_counter: 0
@@ -29,7 +29,7 @@ defmodule Membrane.Hackney.SourceTest do
     name: :source
   }
 
-  def state_streaming(_) do
+  defp state_streaming(_params) do
     state =
       @default_state
       |> Map.merge(%{
@@ -119,7 +119,7 @@ defmodule Membrane.Hackney.SourceTest do
     end
   end
 
-  def test_msg_trigger_redemand(msg, state) do
+  defp test_msg_trigger_redemand(msg, state) do
     assert {{:ok, actions}, new_state} = @module.handle_other(msg, @ctx_other_pl, state)
     assert actions == [redemand: :output]
     assert new_state.streaming == false
@@ -270,7 +270,7 @@ defmodule Membrane.Hackney.SourceTest do
     end
   end
 
-  def state_resume_not_live(_) do
+  defp state_resume_not_live(_params) do
     state =
       @default_state
       |> Map.merge(%{
@@ -284,7 +284,7 @@ defmodule Membrane.Hackney.SourceTest do
     [state: state, second_response: second_response, expected_headers: expected_headers]
   end
 
-  def test_reconnect(ctx, tested_call) do
+  defp test_reconnect(ctx, tested_call) do
     %{
       second_response: second_response,
       state: state,
@@ -331,7 +331,7 @@ defmodule Membrane.Hackney.SourceTest do
     end
   end
 
-  def state_resume_live(_) do
+  defp state_resume_live(_params) do
     state =
       @default_state
       |> Map.merge(%{

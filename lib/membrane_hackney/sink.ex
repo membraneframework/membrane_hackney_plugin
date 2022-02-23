@@ -3,9 +3,10 @@ defmodule Membrane.Hackney.Sink do
   An element uploading data over HTTP(S) based on Hackney
   """
   use Membrane.Sink
-  use Membrane.Log, tags: :membrane_hackney_sink
-  alias Membrane.Buffer
+
   import Mockery.Macro
+
+  alias Membrane.Buffer
 
   def_input_pad :input, caps: :any, demand_unit: :bytes
 
