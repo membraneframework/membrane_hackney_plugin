@@ -1,14 +1,14 @@
 defmodule Membrane.Hackney.Plugin.Mixfile do
   use Mix.Project
 
-  @version "0.6.0"
+  @version "0.7.0"
   @github_url "http://github.com/membraneframework/membrane_hackney_plugin"
 
   def project do
     [
       app: :membrane_hackney_plugin,
       version: @version,
-      elixir: "~> 1.10",
+      elixir: "~> 1.12",
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
 
@@ -37,10 +37,10 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
 
   defp deps do
     [
-      {:membrane_core, "~> 0.8.0"},
+      {:membrane_core, "~> 0.9.0"},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:mockery, "~> 2.3", runtime: false},
-      {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false},
+      {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
       {:credo, "~> 1.4", only: :dev, runtime: false},
       {:hackney, "~> 1.16"}
     ]
@@ -49,7 +49,7 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
   defp package do
     [
       maintainers: ["Membrane Team"],
-      licenses: ["Apache 2.0"],
+      licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @github_url,
         "Membrane Framework Homepage" => "https://membraneframework.org"
@@ -60,7 +60,8 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
   defp docs do
     [
       main: "readme",
-      extras: ["README.md"],
+      extras: ["README.md", "LICENSE"],
+      formatters: ["html"],
       source_ref: "v#{@version}",
       nest_modules_by_prefix: [
         Membrane.Hackney
