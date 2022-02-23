@@ -33,16 +33,16 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
   end
 
   defp elixirc_paths(:test), do: ["lib", "spec/support"]
-  defp elixirc_paths(_), do: ["lib"]
+  defp elixirc_paths(_env), do: ["lib"]
 
   defp deps do
     [
       {:membrane_core, "~> 0.9.0"},
-      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
+      {:hackney, "~> 1.16"},
       {:mockery, "~> 2.3", runtime: false},
-      {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
-      {:credo, "~> 1.4", only: :dev, runtime: false},
-      {:hackney, "~> 1.16"}
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.0", only: :dev, runtime: false},
+      {:credo, "~> 1.4", only: :dev, runtime: false}
     ]
   end
 
@@ -65,18 +65,7 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
       source_ref: "v#{@version}",
       nest_modules_by_prefix: [
         Membrane.Hackney
-      ],
-      before_closing_head_tag: &sidebar_fix/1
+      ]
     ]
-  end
-
-  defp sidebar_fix(_) do
-    """
-    <style type="text/css">
-    .sidebar div.sidebar-header {
-      margin: 15px;
-    }
-    </style>
-    """
   end
 end
