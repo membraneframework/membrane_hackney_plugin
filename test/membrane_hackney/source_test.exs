@@ -3,6 +3,7 @@ defmodule Membrane.Hackney.SourceTest do
   use ExUnit.Case, async: true
   use Mockery
   alias Membrane.Element.CallbackContext, as: Ctx
+  alias Membrane.RemoteStream
 
   @module Membrane.Hackney.Source
 
@@ -65,7 +66,8 @@ defmodule Membrane.Hackney.SourceTest do
         body: "body"
       })
 
-    assert {:ok, new_state} = @module.handle_prepared_to_playing(nil, state)
+    caps = [caps: {:output, %RemoteStream{type: :packetized}}]
+    assert {{:ok, ^caps}, new_state} = @module.handle_prepared_to_playing(nil, state)
     assert new_state.async_response == :mock_response
     assert new_state.streaming == true
 
