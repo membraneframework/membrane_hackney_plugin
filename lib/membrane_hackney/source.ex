@@ -10,11 +10,11 @@ defmodule Membrane.Hackney.Source do
 
   import Mockery.Macro
 
-  alias Membrane.{Buffer, Element, Time}
+  alias Membrane.{Buffer, Element, RemoteStream, Time}
 
   require Membrane.Logger
 
-  def_output_pad :output, caps: :any
+  def_output_pad :output, caps: {RemoteStream, type: :packetized, content_format: nil}
 
   def_options location: [
                 type: :string,
@@ -96,7 +96,14 @@ defmodule Membrane.Hackney.Source do
 
   @impl true
   def handle_prepared_to_playing(_ctx, state) do
-    state |> connect
+    case connect(state) do
+      {:ok, state} ->
+        caps = [caps: {:output, %RemoteStream{type: :packetized}}]
+        {{:ok, caps}, state}
+
+      error ->
+        error
+    end
   end
 
   @impl true
