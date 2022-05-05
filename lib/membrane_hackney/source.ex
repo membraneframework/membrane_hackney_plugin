@@ -14,7 +14,7 @@ defmodule Membrane.Hackney.Source do
 
   require Membrane.Logger
 
-  def_output_pad :output, caps: {RemoteStream, type: :packetized, content_format: nil}
+  def_output_pad :output, caps: {RemoteStream, type: :bytestream, content_format: nil}
 
   def_options location: [
                 type: :string,
@@ -98,7 +98,7 @@ defmodule Membrane.Hackney.Source do
   def handle_prepared_to_playing(_ctx, state) do
     case connect(state) do
       {:ok, state} ->
-        caps = [caps: {:output, %RemoteStream{type: :packetized}}]
+        caps = [caps: {:output, %RemoteStream{type: :bytestream}}]
         {{:ok, caps}, state}
 
       error ->
