@@ -66,7 +66,7 @@ defmodule Membrane.Hackney.SourceTest do
         body: "body"
       })
 
-    caps = [caps: {:output, %RemoteStream{type: :packetized}}]
+    caps = [caps: {:output, %RemoteStream{type: :bytestream}}]
     assert {{:ok, ^caps}, new_state} = @module.handle_prepared_to_playing(nil, state)
     assert new_state.async_response == :mock_response
     assert new_state.streaming == true
