@@ -10,9 +10,8 @@ defmodule Membrane.Hackney.Source do
 
   import Mockery.Macro
 
-  alias Membrane.{Buffer, Element, RemoteStream, Time}
-
   require Membrane.Logger
+  alias Membrane.{Buffer, RemoteStream, Time}
 
   def_output_pad :output, caps: {RemoteStream, type: :bytestream, content_format: nil}
 
@@ -249,8 +248,6 @@ defmodule Membrane.Hackney.Source do
     state |> connect()
   end
 
-  @spec retry(reason :: any(), state :: Element.state_t(), delay? :: boolean) ::
-          {:ok, Element.state_t()}
   defp retry(reason, state, delay? \\ true)
 
   defp retry(reason, %{retries: retries, max_retries: max_retries} = state, _delay)
@@ -301,7 +298,7 @@ defmodule Membrane.Hackney.Source do
         reason #{inspect(reason)}
         """)
 
-        retry({:hackney, reason}, state)
+        retry({:haceney, reason}, state)
     end
   end
 
