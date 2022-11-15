@@ -3,12 +3,38 @@ defmodule Membrane.Element.Hackney.SinkTest do
   use Mockery
 
   alias Membrane.Buffer
+  alias Membrane.Element.CallbackContext, as: Ctx
 
   @module Membrane.Hackney.Sink
 
   @mock_url "http://some_url.com/upload"
   @mock_conn_ref :conn_ref
   @mock_payload "payload!"
+
+  defp get_contexts(_params) do
+    {:ok, resource_guard} = Membrane.ResourceGuard.start_link(self())
+
+    ctx_fields = [
+      playback: :playing,
+      pads: %{},
+      clock: nil,
+      parent_clock: nil,
+      resource_guard: resource_guard,
+      utility_supervisor: :mock_utility_supervisor,
+      name: :source
+    ]
+
+    [
+      ctx_write: Ctx.Write,
+      ctx_playing: Ctx.Playing,
+      ctx_init: Ctx.Init,
+      ctx_end_of_stream: Ctx.StreamManagement,
+      ctx_event: Ctx.Event
+    ]
+    |> Bunch.KVList.map_values(&struct(&1, ctx_fields))
+  end
+
+  setup :get_contexts
 
   defp initial_state do
     %{
@@ -25,38 +51,32 @@ defmodule Membrane.Element.Hackney.SinkTest do
     %{initial_state() | conn_ref: @mock_conn_ref}
   end
 
-  test "Initialization" do
-    assert @module.handle_init(%@module{location: @mock_url}) == {:ok, initial_state()}
+  test "Initialization", %{ctx_init: ctx} do
+    assert @module.handle_init(ctx, %@module{location: @mock_url}) == {[], initial_state()}
   end
 
-  test "Moving to playing state" do
+  test "Moving to playing state", %{ctx_playing: ctx} do
     mock(:hackney, [request: 5], {:ok, @mock_conn_ref})
 
-    assert {{:ok, action}, new_state} = @module.handle_prepared_to_playing(%{}, initial_state())
+    assert {actions, new_state} = @module.handle_playing(ctx, initial_state())
 
-    assert [demand: {:input, demand}] = action
+    assert [demand: {:input, demand}] = actions
     assert demand > 0
 
     assert new_state.conn_ref == @mock_conn_ref
+
+    assert_called(Membrane.ResourceGuard, :register_resource)
   end
 
-  test "Leaving playing state" do
-    mock(:hackney, close: 1)
-
-    assert @module.handle_playing_to_prepared(%{}, playing_state()) == {:ok, initial_state()}
-    conn_ref = @mock_conn_ref
-    assert_called(:hackney, :close, [^conn_ref])
-  end
-
-  test "handling incoming buffers" do
+  test "handling incoming buffers", %{ctx_write: ctx} do
     mock(:hackney, send_body: 2)
 
     state = playing_state()
 
-    assert {{:ok, action}, ^state} =
-             @module.handle_write(:input, %Buffer{payload: @mock_payload}, %{}, state)
+    assert {actions, ^state} =
+             @module.handle_write(:input, %Buffer{payload: @mock_payload}, ctx, state)
 
-    assert [demand: {:input, demand}] = action
+    assert [demand: {:input, demand}] = actions
     assert demand > 0
 
     conn_ref = @mock_conn_ref
@@ -65,7 +85,7 @@ defmodule Membrane.Element.Hackney.SinkTest do
   end
 
   describe "event handling:" do
-    test "EndOfStream" do
+    test "EndOfStream", %{ctx_end_of_stream: ctx} do
       status = 200
       headers = []
       body = "body"
@@ -74,17 +94,17 @@ defmodule Membrane.Element.Hackney.SinkTest do
       mock(:hackney, [start_response: 1], {:ok, status, headers, @mock_conn_ref})
       mock(:hackney, [body: 1], {:ok, body})
 
-      assert {{:ok, actions}, ^state} = @module.handle_end_of_stream(:input, %{}, state)
+      assert {actions, ^state} = @module.handle_end_of_stream(:input, ctx, state)
 
       assert [response, eos] = actions |> Keyword.get_values(:notify)
       assert response == %@module.Response{status: status, headers: headers, body: body}
       assert eos == {:end_of_stream, :input}
     end
 
-    test "others" do
+    test "others", %{ctx_event: ctx} do
       mock_event = :event
       state = playing_state()
-      assert @module.handle_event(:input, mock_event, %{}, state) == {:ok, state}
+      assert @module.handle_event(:input, mock_event, ctx, state) == {[], state}
     end
   end
 end

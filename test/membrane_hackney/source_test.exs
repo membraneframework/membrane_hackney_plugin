@@ -22,13 +22,25 @@ defmodule Membrane.Hackney.SourceTest do
     pos_counter: 0
   }
 
-  @ctx_other_pl %Ctx.Other{
-    playback_state: :playing,
-    pads: %{},
-    clock: nil,
-    parent_clock: nil,
-    name: :source
-  }
+  defp get_contexts(_params \\ nil) do
+    {:ok, resource_guard} = Membrane.ResourceGuard.start_link(self())
+
+    ctx_fields = [
+      playback: :playing,
+      pads: %{},
+      clock: nil,
+      parent_clock: nil,
+      resource_guard: resource_guard,
+      utility_supervisor: :mock_utility_supervisor,
+      name: :source
+    ]
+
+    [
+      ctx_info: struct!(Ctx.Info, ctx_fields),
+      ctx_playing: struct!(Ctx.Playing, ctx_fields),
+      ctx_demand: struct!(Ctx.Demand, [incoming_demand: 1] ++ ctx_fields)
+    ]
+  end
 
   defp state_streaming(_params) do
     state =
@@ -38,24 +50,18 @@ defmodule Membrane.Hackney.SourceTest do
         async_response: :mock_response
       })
 
-    [state_streaming: state]
+    [state_streaming: state] ++ get_contexts()
   end
 
-  test "handle_playing_to_prepared/2 should close request when moving from :playing to :prepared" do
-    state = %{@default_state | async_response: :mock_response}
+  test "handle_setup should do nothing" do
     mock(:hackney, close: 1)
-    assert {:ok, new_state} = @module.handle_playing_to_prepared(nil, state)
-    assert new_state.async_response == nil
-    assert_called(:hackney, :close, [:mock_response])
-  end
-
-  test "handle_stopped_to_prepared should do nothing" do
-    mock(:hackney, close: 1)
-    assert @module.handle_stopped_to_prepared(:stopped, @default_state) == {:ok, @default_state}
+    assert @module.handle_setup(:stopped, @default_state) == {[], @default_state}
     refute_called(:hackney, :close)
   end
 
-  test "handle_prepared_to_playing/1 should start an async request" do
+  test "handle_playing/2 should start an async request" do
+    ctx = get_contexts()[:ctx_playing]
+
     mock(:hackney, [request: 5], {:ok, :mock_response})
 
     state =
@@ -66,8 +72,8 @@ defmodule Membrane.Hackney.SourceTest do
         body: "body"
       })
 
-    caps = [caps: {:output, %RemoteStream{type: :bytestream}}]
-    assert {{:ok, ^caps}, new_state} = @module.handle_prepared_to_playing(nil, state)
+    actions = [stream_format: {:output, %RemoteStream{type: :bytestream}}]
+    assert {^actions, new_state} = @module.handle_playing(ctx, state)
     assert new_state.async_response == :mock_response
     assert new_state.streaming == true
 
@@ -81,11 +87,13 @@ defmodule Membrane.Hackney.SourceTest do
   end
 
   describe "handle_demand/5 should" do
+    setup :get_contexts
+
     test "request next chunk if it haven't been already" do
       state = %{@default_state | async_response: :mock_response}
       mock(:hackney, [stream_next: 1], :ok)
 
-      assert {:ok, new_state} = @module.handle_demand(:output, 42, :bytes, nil, state)
+      assert {[], new_state} = @module.handle_demand(:output, 42, :bytes, nil, state)
       assert new_state.async_response == :mock_response
       assert new_state.streaming == true
 
@@ -94,92 +102,99 @@ defmodule Membrane.Hackney.SourceTest do
       assert_called(:hackney, :stream_next, [^pin_response])
     end
 
-    test "return error when stream_next fails" do
+    test "return error when stream_next fails", %{ctx_demand: ctx} do
       state = %{@default_state | async_response: :mock_response}
       mock(:hackney, [stream_next: 1], {:error, :reason})
       mock(:hackney, close: 1)
 
-      assert {{:error, reason}, new_state} =
-               @module.handle_demand(:output, 42, :bytes, nil, state)
-
-      assert reason == {:stream_next, :reason}
-      assert new_state.async_response == nil
-      assert new_state.streaming == false
+      assert_raise RuntimeError,
+                   ~r/Max.*retries.*number.*reached.*Retry.*reason.*stream_next.*reason/,
+                   fn -> @module.handle_demand(:output, 42, :bytes, ctx, state) end
 
       pin_response = :mock_response
-
       assert_called(:hackney, :stream_next, [^pin_response])
-      assert_called(:hackney, :close, [:mock_response])
+      assert_called(Membrane.ResourceGuard, :cleanup_resource)
     end
 
     test "do nothing when next chunk from :hackney was requested" do
       state = %{@default_state | streaming: true}
       mock(:hackney, [stream_next: 1], {:ok, :mock_response})
 
-      assert @module.handle_demand(:output, 42, :bytes, nil, state) == {:ok, state}
+      assert @module.handle_demand(:output, 42, :bytes, nil, state) == {[], state}
       refute_called(:hackney, :stream_next)
     end
   end
 
-  defp test_msg_trigger_redemand(msg, state) do
-    assert {{:ok, actions}, new_state} = @module.handle_other(msg, @ctx_other_pl, state)
+  defp test_msg_trigger_redemand(msg, ctx, state) do
+    assert {actions, new_state} = @module.handle_info(msg, ctx, state)
     assert actions == [redemand: :output]
     assert new_state.streaming == false
   end
 
-  describe "handle_other/3 for message" do
+  describe "handle_info/3 for message" do
     setup :state_streaming
 
     test "async status 200 should trigger redemand with streaming false", %{
-      state_streaming: state
+      state_streaming: state,
+      ctx_info: ctx
     } do
       msg = {:hackney_response, :mock_response, {:status, 200, "OK"}}
-      test_msg_trigger_redemand(msg, state)
+      test_msg_trigger_redemand(msg, ctx, state)
     end
 
     test "async status 206 should trigger redemand with streaming false", %{
-      state_streaming: state
+      state_streaming: state,
+      ctx_info: ctx
     } do
       msg = {:hackney_response, :mock_response, {:status, 206, "206"}}
-      test_msg_trigger_redemand(msg, state)
+      test_msg_trigger_redemand(msg, ctx, state)
     end
 
-    test "async status 301 should return error and close connection", %{state_streaming: state} do
+    test "async status 301 should return error and close connection", %{
+      state_streaming: state,
+      ctx_info: ctx
+    } do
       msg = {:hackney_response, :mock_response, {:status, 301, "301"}}
       mock(:hackney, [close: 1], :ok)
-      assert {{:error, reason}, new_state} = @module.handle_other(msg, @ctx_other_pl, state)
-      assert reason == {:hackney, :redirect}
-      assert new_state.streaming == false
-      assert new_state.async_response == nil
-      assert_called(:hackney, :close, [:mock_response])
+
+      assert_raise RuntimeError,
+                   ~r/Max.*retries.*number.*reached.*Retry.*reason.*hackney.*redirect/,
+                   fn -> @module.handle_info(msg, ctx, state) end
+
+      assert_called(Membrane.ResourceGuard, :cleanup_resource)
     end
 
     test "async status 302 should should return error and close connection", %{
-      state_streaming: state
+      state_streaming: state,
+      ctx_info: ctx
     } do
       msg = {:hackney_response, :mock_response, {:status, 302, "302"}}
       mock(:hackney, [close: 1], :ok)
-      assert {{:error, reason}, new_state} = @module.handle_other(msg, @ctx_other_pl, state)
-      assert reason == {:hackney, :redirect}
-      assert new_state.streaming == false
-      assert new_state.async_response == nil
-      assert_called(:hackney, :close, [:mock_response])
+
+      assert_raise RuntimeError,
+                   ~r/Max.*retries.*number.*reached.*Retry.*reason.*hackney.*redirect/,
+                   fn -> @module.handle_info(msg, ctx, state) end
+
+      assert_called(Membrane.ResourceGuard, :cleanup_resource)
     end
 
     test "async status 416 should should return error and close connection", %{
-      state_streaming: state
+      state_streaming: state,
+      ctx_info: ctx
     } do
       msg = {:hackney_response, :mock_response, {:status, 416, "416"}}
       mock(:hackney, [close: 1], :ok)
-      assert {{:error, reason}, new_state} = @module.handle_other(msg, @ctx_other_pl, state)
-      assert reason == {:hackney, :invalid_range}
-      assert new_state.streaming == false
-      assert new_state.async_response == nil
-      assert_called(:hackney, :close, [:mock_response])
+
+      assert_raise RuntimeError,
+                   ~r/Max.*retries.*number.*reached.*Retry.*reason.*hackney.*invalid_range/,
+                   fn -> @module.handle_info(msg, ctx, state) end
+
+      assert_called(Membrane.ResourceGuard, :cleanup_resource)
     end
 
     test "async status with unsupported code should return error and close connection", %{
-      state_streaming: state
+      state_streaming: state,
+      ctx_info: ctx
     } do
       mock(:hackney, [close: 1], :ok)
       codes = [500, 501, 502, 402, 404]
@@ -187,32 +202,39 @@ defmodule Membrane.Hackney.SourceTest do
       codes
       |> Enum.each(fn code ->
         msg = {:hackney_response, :mock_response, {:status, code, "#{code}"}}
-        assert {{:error, reason}, new_state} = @module.handle_other(msg, @ctx_other_pl, state)
-        assert reason == {:http_code, code}
-        assert new_state.streaming == false
-        assert new_state.async_response == nil
+
+        assert_raise RuntimeError,
+                     ~r/Max.*retries.*number.*reached.*Retry.*reason.*http_code/,
+                     fn -> @module.handle_info(msg, ctx, state) end
       end)
 
-      assert_called(:hackney, :close, [:mock_response], [length(codes)])
+      assert_called(Membrane.ResourceGuard, :cleanup_resource)
     end
 
-    test "async headers should trigger redemand with streaming false", %{state_streaming: state} do
+    test "async headers should trigger redemand with streaming false", %{
+      state_streaming: state,
+      ctx_info: ctx
+    } do
       msg = {:hackney_response, :mock_response, {:headers, []}}
-      test_msg_trigger_redemand(msg, state)
+      test_msg_trigger_redemand(msg, ctx, state)
     end
 
-    test "async chunk when not playing should ignore the data", %{state_streaming: state} do
+    test "async chunk when not playing should ignore the data", %{
+      state_streaming: state,
+      ctx_info: ctx
+    } do
       msg = {:hackney_response, :mock_response, <<>>}
-      ctx = Map.put(@ctx_other_pl, :playback_state, :prepared)
-      assert {:ok, new_state} = @module.handle_other(msg, ctx, state)
+      ctx = Map.put(ctx, :playback, :prepared)
+      assert {[], new_state} = @module.handle_info(msg, ctx, state)
       assert new_state.streaming == false
     end
 
     test "async chunk should produce buffer, update pos_counter and trigger redemand", %{
-      state_streaming: state
+      state_streaming: state,
+      ctx_info: ctx
     } do
       msg = {:hackney_response, :mock_response, <<1, 2, 3>>}
-      assert {{:ok, actions}, new_state} = @module.handle_other(msg, @ctx_other_pl, state)
+      assert {actions, new_state} = @module.handle_info(msg, ctx, state)
 
       assert [buffer: buf_action, redemand: :output] = actions
       assert buf_action == {:output, %Membrane.Buffer{payload: <<1, 2, 3>>}}
@@ -222,27 +244,33 @@ defmodule Membrane.Hackney.SourceTest do
     end
 
     test "async end should send EOS event and remove asyn_response from state", %{
-      state_streaming: state
+      state_streaming: state,
+      ctx_info: ctx
     } do
       msg = {:hackney_response, :mock_response, :done}
-      assert {{:ok, actions}, new_state} = @module.handle_other(msg, @ctx_other_pl, state)
+      assert {actions, new_state} = @module.handle_info(msg, ctx, state)
       assert actions == [end_of_stream: :output]
       assert new_state.async_response == nil
       assert new_state.streaming == false
     end
 
-    test ":hackney error should return error and close request", %{state_streaming: state} do
+    test ":hackney error should return error and close request", %{
+      state_streaming: state,
+      ctx_info: ctx
+    } do
       mock(:hackney, [close: 1], :ok)
       msg = {:hackney_response, :mock_response, {:error, :reason}}
-      assert {{:error, reason}, new_state} = @module.handle_other(msg, @ctx_other_pl, state)
-      assert reason == {:hackney, :reason}
-      assert new_state.streaming == false
-      assert new_state.async_response == nil
-      assert_called(:hackney, :close, [:mock_response])
+
+      assert_raise RuntimeError,
+                   ~r/Max.*retries.*number.*reached.*Retry.*reason.*hackney.*reason/,
+                   fn -> @module.handle_info(msg, ctx, state) end
+
+      assert_called(Membrane.ResourceGuard, :cleanup_resource)
     end
 
     test "async redirect should change location and start create new request", %{
-      state_streaming: state
+      state_streaming: state,
+      ctx_info: ctx
     } do
       second_response = :mock_response2
       mock(:hackney, [close: 1], :ok)
@@ -257,7 +285,7 @@ defmodule Membrane.Hackney.SourceTest do
         })
 
       msg = {:hackney_response, :mock_response, {:redirect, "url2", []}}
-      assert {:ok, new_state} = @module.handle_other(msg, @ctx_other_pl, state)
+      assert {[], new_state} = @module.handle_info(msg, ctx, state)
       assert new_state.location == "url2"
       assert new_state.async_response == second_response
       assert new_state.streaming == true
@@ -283,7 +311,12 @@ defmodule Membrane.Hackney.SourceTest do
 
     second_response = :mock_response2
     expected_headers = [{"Range", "bytes=42-"}]
-    [state: state, second_response: second_response, expected_headers: expected_headers]
+
+    [
+      state: state,
+      second_response: second_response,
+      expected_headers: expected_headers
+    ] ++ get_contexts()
   end
 
   defp test_reconnect(ctx, tested_call) do
@@ -296,7 +329,7 @@ defmodule Membrane.Hackney.SourceTest do
     mock(:hackney, [close: 1], :ok)
     mock(:hackney, [request: 5], {:ok, ctx.second_response})
 
-    assert {:ok, new_state} = tested_call.(state)
+    assert {[], new_state} = tested_call.(state)
     assert new_state.async_response == second_response
     assert new_state.streaming == true
 
@@ -308,26 +341,27 @@ defmodule Membrane.Hackney.SourceTest do
       [stream_to: _, async: :once]
     ])
 
-    assert_called(:hackney, :close, [:mock_response])
+    assert_called(Membrane.ResourceGuard, :cleanup_resource)
   end
 
   describe "with max_retries = 1 in options" do
     setup :state_resume_not_live
 
-    test "handle_demand should reconnect on error starting from current position", ctx do
+    test "handle_demand should reconnect on error starting from current position",
+         %{ctx_demand: ctx_demand} = test_ctx do
       mock(:hackney, [stream_next: 1], {:error, :reason})
 
-      test_reconnect(ctx, fn state ->
-        @module.handle_demand(:output, 42, :bytes, nil, state)
+      test_reconnect(test_ctx, fn state ->
+        @module.handle_demand(:output, 42, :bytes, ctx_demand, state)
       end)
 
       assert_called(:hackney, :stream_next, [:mock_response])
     end
 
-    test "handle_other should send :reconnect on error", %{state: state} do
+    test "handle_info should send :reconnect on error", %{state: state, ctx_info: ctx} do
       msg = {:hackney_response, :mock_response, {:error, :reason}}
       mock(:hackney, [close: 1], :ok)
-      assert {:ok, new_state} = @module.handle_other(msg, @ctx_other_pl, state)
+      assert {[], new_state} = @module.handle_info(msg, ctx, state)
       assert new_state.retries == state.retries + 1
       assert_receive :reconnect
     end
@@ -344,17 +378,22 @@ defmodule Membrane.Hackney.SourceTest do
       })
 
     second_response = :mock_response2
-    [state: state, second_response: second_response, expected_headers: []]
+
+    [
+      state: state,
+      second_response: second_response,
+      expected_headers: []
+    ] ++ get_contexts()
   end
 
   describe "with max_retries = 1 and is_live: true in options" do
     setup :state_resume_live
 
-    test "handle_demand should reconnect on error", ctx do
+    test "handle_demand should reconnect on error", %{ctx_demand: ctx_demand} = test_ctx do
       mock(:hackney, [stream_next: 1], {:error, :reason})
 
-      test_reconnect(ctx, fn state ->
-        @module.handle_demand(:output, 42, :bytes, nil, state)
+      test_reconnect(test_ctx, fn state ->
+        @module.handle_demand(:output, 42, :bytes, ctx_demand, state)
       end)
 
       # trick to overcome Mockery limitations
@@ -362,10 +401,10 @@ defmodule Membrane.Hackney.SourceTest do
       assert_called(:hackney, :stream_next, [^pin_response])
     end
 
-    test "handle_other", %{state: state} do
+    test "handle_info", %{state: state, ctx_info: ctx} do
       msg = {:hackney_response, :mock_response, {:error, :reason}}
       mock(:hackney, [close: 1], :ok)
-      assert {:ok, new_state} = @module.handle_other(msg, @ctx_other_pl, state)
+      assert {[], new_state} = @module.handle_info(msg, ctx, state)
       assert new_state.retries == state.retries + 1
       assert_receive :reconnect
     end

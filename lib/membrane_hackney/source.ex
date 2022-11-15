@@ -13,7 +13,10 @@ defmodule Membrane.Hackney.Source do
   require Membrane.Logger
   alias Membrane.{Buffer, RemoteStream, Time}
 
-  def_output_pad :output, caps: {RemoteStream, type: :bytestream, content_format: nil}
+  @resource_name :hackney_soruce_resource
+
+  def_output_pad :output,
+    accepted_format: %RemoteStream{type: :bytestream, content_format: nil}
 
   def_options location: [
                 type: :string,
@@ -68,7 +71,7 @@ defmodule Membrane.Hackney.Source do
               ]
 
   @impl true
-  def handle_init(%__MODULE__{} = options) do
+  def handle_init(_ctx, %__MODULE__{} = options) do
     state =
       options
       |> Map.merge(%{
@@ -78,51 +81,34 @@ defmodule Membrane.Hackney.Source do
         pos_counter: 0
       })
 
-    {:ok, state}
+    {[], state}
   end
 
   @impl true
-  def handle_playing_to_prepared(_ctx, %{async_response: response} = state) do
-    state =
-      if response != nil do
-        state |> close_request()
-      else
-        state
-      end
-
-    {:ok, %{state | retries: 0, pos_counter: 0}}
-  end
-
-  @impl true
-  def handle_prepared_to_playing(_ctx, state) do
-    case connect(state) do
-      {:ok, state} ->
-        caps = [caps: {:output, %RemoteStream{type: :bytestream}}]
-        {{:ok, caps}, state}
-
-      error ->
-        error
-    end
+  def handle_playing(ctx, state) do
+    {actions, state} = connect(ctx, state)
+    actions = actions ++ [stream_format: {:output, %RemoteStream{type: :bytestream}}]
+    {actions, state}
   end
 
   @impl true
   def handle_demand(:output, _size, _unit, _ctx, %{streaming: true} = state) do
     # We have already requested next frame (using :hackney.stream_next())
     # so we do nothinig
-    {:ok, state}
+    {[], state}
   end
 
   def handle_demand(:output, _size, _unit, _ctx, %{async_response: nil} = state) do
     # We're waiting for reconnect
-    {:ok, state}
+    {[], state}
   end
 
-  def handle_demand(:output, _size, _unit, _ctx, state) do
+  def handle_demand(:output, _size, _unit, ctx, state) do
     Membrane.Logger.debug("Hackney: requesting next chunk")
 
     case state.async_response |> mockable(:hackney).stream_next() do
       :ok ->
-        {:ok, %{state | streaming: true}}
+        {[], %{state | streaming: true}}
 
       {:error, reason} ->
         Membrane.Logger.warn("Hackney.stream_next/1 error: #{inspect(reason)}")
@@ -130,33 +116,33 @@ defmodule Membrane.Hackney.Source do
         # Error here is rather caused by library error,
         # so we retry without delay - we will either sucessfully reconnect
         # or will get an error resulting in retry with delay
-        retry({:stream_next, reason}, state |> close_request(), false)
+        retry({:stream_next, reason}, ctx, close_request(ctx, state), false)
     end
   end
 
   @impl true
-  def handle_other({:hackney_response, msg_id, msg}, _ctx, %{async_response: id} = state)
+  def handle_info({:hackney_response, msg_id, msg}, _ctx, %{async_response: id} = state)
       when msg_id != id do
     Membrane.Logger.warn(
       "Ignoring message #{inspect(msg)} because it does not match current response id: #{inspect(id)}"
     )
 
-    {:ok, state}
+    {[], state}
   end
 
-  def handle_other(
+  def handle_info(
         {:hackney_response, id, {:status, code, desc}},
         _ctx,
         %{async_response: id} = state
       )
       when code in [200, 206] do
     Membrane.Logger.debug("Hackney: Got #{code} #{desc}")
-    {{:ok, redemand: :output}, %{state | streaming: false, retries: 0}}
+    {[redemand: :output], %{state | streaming: false, retries: 0}}
   end
 
-  def handle_other(
+  def handle_info(
         {:hackney_response, id, {:status, code, _data}},
-        _ctx,
+        ctx,
         %{async_response: id} = state
       )
       when code in [301, 302] do
@@ -165,43 +151,43 @@ defmodule Membrane.Hackney.Source do
     If you want to follow add `follow_redirect: true` to :poison_opts
     """)
 
-    retry({:hackney, :redirect}, state |> close_request())
+    retry({:hackney, :redirect}, ctx, close_request(ctx, state))
   end
 
-  def handle_other(
+  def handle_info(
         {:hackney_response, id, {:status, 416, _data}},
-        _ctx,
+        ctx,
         %{async_response: id} = state
       ) do
     Membrane.Logger.warn(
       "Hackney: Got 416 Invalid Range (pos_counter is #{inspect(state.pos_counter)})"
     )
 
-    retry({:hackney, :invalid_range}, state |> close_request())
+    retry({:hackney, :invalid_range}, ctx, close_request(ctx, state))
   end
 
-  def handle_other(
+  def handle_info(
         {:hackney_response, id, {:status, code, _data}},
-        _ctx,
+        ctx,
         %{async_response: id} = state
       ) do
     Membrane.Logger.warn("Hackney: Got unexpected status code #{code}")
-    retry({:http_code, code}, state |> close_request())
+    retry({:http_code, code}, ctx, close_request(ctx, state))
   end
 
-  def handle_other(
+  def handle_info(
         {:hackney_response, id, {:headers, headers}},
         _ctx,
         %{async_response: id} = state
       ) do
     Membrane.Logger.debug("Hackney: Got headers #{inspect(headers)}")
 
-    {{:ok, redemand: :output}, %{state | streaming: false}}
+    {[redemand: :output], %{state | streaming: false}}
   end
 
-  def handle_other(
+  def handle_info(
         {:hackney_response, id, chunk},
-        %Ctx.Other{playback_state: :playing},
+        %Ctx.Info{playback: :playing},
         %{async_response: id} = state
       )
       when is_binary(chunk) do
@@ -210,61 +196,62 @@ defmodule Membrane.Hackney.Source do
       |> Map.update!(:pos_counter, &(&1 + byte_size(chunk)))
 
     actions = [buffer: {:output, %Buffer{payload: chunk}}, redemand: :output]
-    {{:ok, actions}, %{state | streaming: false}}
+    {actions, %{state | streaming: false}}
   end
 
-  def handle_other({:hackney_response, id, chunk}, _ctx, %{async_response: id} = state)
+  def handle_info({:hackney_response, id, chunk}, _ctx, %{async_response: id} = state)
       when is_binary(chunk) do
     # We received chunk after we've stopped playing. We'll ignore that data.
-    {:ok, %{state | streaming: false}}
+    {[], %{state | streaming: false}}
   end
 
-  def handle_other({:hackney_response, id, :done}, _ctx, %{async_response: id} = state) do
+  def handle_info({:hackney_response, id, :done}, _ctx, %{async_response: id} = state) do
     Membrane.Logger.info("Hackney EOS")
     new_state = %{state | streaming: false, async_response: nil}
-    {{:ok, end_of_stream: :output}, new_state}
+    {[end_of_stream: :output], new_state}
   end
 
-  def handle_other({:hackney_response, id, {:error, reason}}, _ctx, %{async_response: id} = state) do
+  def handle_info({:hackney_response, id, {:error, reason}}, ctx, %{async_response: id} = state) do
     Membrane.Logger.warn("Hackney error #{inspect(reason)}")
 
-    retry({:hackney, reason}, state |> close_request())
+    retry({:hackney, reason}, ctx, close_request(ctx, state))
   end
 
-  def handle_other(
+  def handle_info(
         {:hackney_response, id, {redirect, new_location, _headers}},
-        _ctx,
+        ctx,
         %{async_response: id} = state
       )
       when redirect in [:redirect, :see_other] do
     Membrane.Logger.debug("Hackney: redirecting to #{new_location}")
 
-    %{state | location: new_location, streaming: false}
-    |> close_request()
-    |> connect
+    state = %{state | location: new_location, streaming: false}
+    state = close_request(ctx, state)
+    connect(ctx, state)
   end
 
-  def handle_other(:reconnect, _ctx, state) do
-    state |> connect()
+  def handle_info(:reconnect, ctx, state) do
+    connect(ctx, state)
   end
 
-  defp retry(reason, state, delay? \\ true)
+  defp retry(reason, ctx, state, delay? \\ true)
 
-  defp retry(reason, %{retries: retries, max_retries: max_retries} = state, _delay)
+  defp retry(reason, _ctx, %{retries: retries, max_retries: max_retries}, _delay)
        when retries >= max_retries do
-    {{:error, reason}, state}
+    raise "Error: Max retries number reached. Retry reason: #{inspect(reason)}"
   end
 
-  defp retry(_reason, state, false) do
-    connect(%{state | retries: state.retries + 1})
+  defp retry(_reason, ctx, state, false) do
+    connect(ctx, %{state | retries: state.retries + 1})
   end
 
-  defp retry(_reason, %{retry_delay: delay, retries: retries} = state, true) do
-    Process.send_after(self(), :reconnect, delay |> Time.to_milliseconds())
-    {:ok, %{state | retries: retries + 1}}
+  defp retry(_reason, _ctx, %{retry_delay: delay, retries: retries} = state, true) do
+    delay_miliseconds = Time.round_to_timebase(delay, Time.millisecond())
+    Process.send_after(self(), :reconnect, delay_miliseconds)
+    {[], %{state | retries: retries + 1}}
   end
 
-  defp connect(state) do
+  defp connect(ctx, state) do
     %{
       method: method,
       location: location,
@@ -290,7 +277,8 @@ defmodule Membrane.Hackney.Source do
 
     case mockable(:hackney).request(method, location, headers, body, opts) do
       {:ok, async_response} ->
-        {:ok, %{state | async_response: async_response, streaming: true}}
+        register_resource(ctx, async_response)
+        {[], %{state | async_response: async_response, streaming: true}}
 
       {:error, reason} ->
         Membrane.Logger.warn("""
@@ -298,16 +286,28 @@ defmodule Membrane.Hackney.Source do
         reason #{inspect(reason)}
         """)
 
-        retry({:haceney, reason}, state)
+        retry({:haceney, reason}, ctx, state)
     end
   end
 
-  defp close_request(%{async_response: nil} = state) do
+  defp close_request(_ctx, %{async_response: nil} = state) do
     %{state | streaming: false}
   end
 
-  defp close_request(%{async_response: resp} = state) do
-    _result = mockable(:hackney).close(resp)
+  defp close_request(ctx, state) do
+    cleanup_resource(ctx)
     %{state | async_response: nil, streaming: false}
+  end
+
+  defp register_resource(ctx, resource) do
+    mockable(Membrane.ResourceGuard).register_resource(
+      ctx.resource_guard,
+      fn -> mockable(:hackney).close(resource) end,
+      name: @resource_name
+    )
+  end
+
+  defp cleanup_resource(ctx) do
+    mockable(Membrane.ResourceGuard).cleanup_resource(ctx.resource_guard, @resource_name)
   end
 end
