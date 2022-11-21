@@ -7,8 +7,9 @@ defmodule Membrane.Hackney.Sink do
   import Mockery.Macro
 
   alias Membrane.Buffer
+  alias Membrane.ResourceGuard
 
-  def_input_pad :input, caps: :any, demand_unit: :bytes
+  def_input_pad :input, accepted_format: _any, demand_unit: :bytes
 
   def_options location: [
                 type: :string,
@@ -56,13 +57,13 @@ defmodule Membrane.Hackney.Sink do
   end
 
   @impl true
-  def handle_init(opts) do
+  def handle_init(_ctx, opts) do
     state = opts |> Map.from_struct() |> Map.merge(%{conn_ref: nil})
-    {:ok, state}
+    {[], state}
   end
 
   @impl true
-  def handle_prepared_to_playing(_ctx, state) do
+  def handle_playing(ctx, state) do
     {:ok, conn_ref} =
       mockable(:hackney).request(
         state.method,
@@ -72,20 +73,19 @@ defmodule Membrane.Hackney.Sink do
         state.hackney_opts
       )
 
-    {{:ok, demand: {:input, state.demand_size}}, %{state | conn_ref: conn_ref}}
-  end
+    ResourceGuard.register(
+      ctx.resource_guard,
+      fn -> mockable(:hackney).close(conn_ref) end,
+      tag: {:conn_ref, conn_ref}
+    )
 
-  @impl true
-  def handle_playing_to_prepared(_ctx, state) do
-    mockable(:hackney).close(state.conn_ref)
-
-    {:ok, %{state | conn_ref: nil}}
+    {[demand: {:input, state.demand_size}], %{state | conn_ref: conn_ref}}
   end
 
   @impl true
   def handle_write(:input, %Buffer{payload: payload}, _ctx, state) do
     mockable(:hackney).send_body(state.conn_ref, payload)
-    {{:ok, demand: {:input, state.demand_size}}, state}
+    {[demand: {:input, state.demand_size}], state}
   end
 
   @impl true
@@ -94,6 +94,6 @@ defmodule Membrane.Hackney.Sink do
     {:ok, body} = mockable(:hackney).body(conn_ref)
 
     response_notification = %__MODULE__.Response{status: status, headers: headers, body: body}
-    {{:ok, notify: response_notification, notify: {:end_of_stream, :input}}, state}
+    {[notify_parent: response_notification], state}
   end
 end
