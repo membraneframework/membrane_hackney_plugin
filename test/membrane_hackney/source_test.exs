@@ -69,6 +69,7 @@ defmodule Membrane.Hackney.SourceTest do
     ctx = get_contexts()[:ctx_playing]
 
     mock(:hackney, [request: 5], {:ok, :mock_response})
+    mock(:hackney, [close: 1], :ok)
 
     state =
       @default_state
@@ -90,6 +91,15 @@ defmodule Membrane.Hackney.SourceTest do
       "body",
       [opt: :some, stream_to: _, async: :once]
     ])
+
+    tag = @resource_tag
+    assert_resource_guard_register(ctx.resource_guard, cleanup_function, ^tag)
+
+    refute_called(:hackney, :close)
+
+    cleanup_function.()
+
+    assert_called(:hackney, :close, [:mock_response])
   end
 
   describe "handle_demand/5 should" do
@@ -365,6 +375,13 @@ defmodule Membrane.Hackney.SourceTest do
 
     tag = @resource_tag
     assert_resource_guard_cleanup(resource_guard, ^tag)
+    assert_resource_guard_register(resource_guard, cleanup_function, ^tag)
+
+    refute_called(:hackney, :close)
+
+    cleanup_function.()
+
+    assert_called(:hackney, :close, [^second_response])
   end
 
   describe "with max_retries = 1 in options" do
