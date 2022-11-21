@@ -94,6 +94,6 @@ defmodule Membrane.Hackney.Sink do
     {:ok, body} = mockable(:hackney).body(conn_ref)
 
     response_notification = %__MODULE__.Response{status: status, headers: headers, body: body}
-    {[notify: response_notification, notify: {:end_of_stream, :input}], state}
+    {[notify_parent: response_notification, notify_parent: {:end_of_stream, :input}], state}
   end
 end
