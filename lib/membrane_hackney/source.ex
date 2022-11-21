@@ -13,7 +13,7 @@ defmodule Membrane.Hackney.Source do
   require Membrane.Logger
   alias Membrane.{Buffer, RemoteStream, Time}
 
-  @resource_tag :hackney_soruce_resource
+  @resource_tag :hackney_source_resource
 
   def_output_pad :output,
     accepted_format: %RemoteStream{type: :bytestream, content_format: nil}
@@ -69,9 +69,6 @@ defmodule Membrane.Hackney.Source do
                 """,
                 default: false
               ]
-
-  @spec get_resource_tag() :: atom()
-  def get_resource_tag(), do: @resource_tag
 
   @impl true
   def handle_init(_ctx, %__MODULE__{} = options) do
@@ -306,16 +303,4 @@ defmodule Membrane.Hackney.Source do
     Membrane.ResourceGuard.cleanup(ctx.resource_guard, @resource_tag)
     %{state | async_response: nil, streaming: false}
   end
-
-  # defp register_resource(ctx, resource) do
-  #   Membrane.ResourceGuard.register(
-  #     ctx.resource_guard,
-  #     fn -> mockable(:hackney).close(resource) end,
-  #     name: @resource_name
-  #   )
-  # end
-
-  # defp cleanup_resource(ctx) do
-  #   Membrane.ResourceGuard.cleanup(ctx.resource_guard, @resource_name)
-  # end
 end

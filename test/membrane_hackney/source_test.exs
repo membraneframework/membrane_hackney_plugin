@@ -11,6 +11,8 @@ defmodule Membrane.Hackney.SourceTest do
 
   @module Membrane.Hackney.Source
 
+  @resource_tag :hackney_source_resource
+
   @default_state %{
     body: "",
     headers: [],
@@ -118,7 +120,7 @@ defmodule Membrane.Hackney.SourceTest do
       pin_response = :mock_response
       assert_called(:hackney, :stream_next, [^pin_response])
 
-      tag = @module.get_resource_tag()
+      tag = @resource_tag
       assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
@@ -156,7 +158,7 @@ defmodule Membrane.Hackney.SourceTest do
       test_msg_trigger_redemand(msg, ctx, state)
     end
 
-    test "async status 301 should return error and close connection", %{
+    test "async status 301 should raise error and close connection", %{
       state_streaming: state,
       ctx_info: ctx
     } do
@@ -167,11 +169,11 @@ defmodule Membrane.Hackney.SourceTest do
                    ~r/Max.*retries.*number.*reached.*Retry.*reason.*hackney.*redirect/,
                    fn -> @module.handle_info(msg, ctx, state) end
 
-      tag = @module.get_resource_tag()
+      tag = @resource_tag
       assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
-    test "async status 302 should should return error and close connection", %{
+    test "async status 302 should should raise error and close connection", %{
       state_streaming: state,
       ctx_info: ctx
     } do
@@ -182,11 +184,11 @@ defmodule Membrane.Hackney.SourceTest do
                    ~r/Max.*retries.*number.*reached.*Retry.*reason.*hackney.*redirect/,
                    fn -> @module.handle_info(msg, ctx, state) end
 
-      tag = @module.get_resource_tag()
+      tag = @resource_tag
       assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
-    test "async status 416 should should return error and close connection", %{
+    test "async status 416 should should raise error and close connection", %{
       state_streaming: state,
       ctx_info: ctx
     } do
@@ -197,11 +199,11 @@ defmodule Membrane.Hackney.SourceTest do
                    ~r/Max.*retries.*number.*reached.*Retry.*reason.*hackney.*invalid_range/,
                    fn -> @module.handle_info(msg, ctx, state) end
 
-      tag = @module.get_resource_tag()
+      tag = @resource_tag
       assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
-    test "async status with unsupported code should return error and close connection", %{
+    test "async status with unsupported code should raise error and close connection", %{
       state_streaming: state,
       ctx_info: ctx
     } do
@@ -217,7 +219,7 @@ defmodule Membrane.Hackney.SourceTest do
                      fn -> @module.handle_info(msg, ctx, state) end
       end)
 
-      tag = @module.get_resource_tag()
+      tag = @resource_tag
       assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
@@ -264,7 +266,7 @@ defmodule Membrane.Hackney.SourceTest do
       assert new_state.streaming == false
     end
 
-    test ":hackney error should return error and close request", %{
+    test ":hackney error should return raise and close request", %{
       state_streaming: state,
       ctx_info: ctx
     } do
@@ -275,7 +277,7 @@ defmodule Membrane.Hackney.SourceTest do
                    ~r/Max.*retries.*number.*reached.*Retry.*reason.*hackney.*reason/,
                    fn -> @module.handle_info(msg, ctx, state) end
 
-      tag = @module.get_resource_tag()
+      tag = @resource_tag
       assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
@@ -309,7 +311,7 @@ defmodule Membrane.Hackney.SourceTest do
         [opt: :some, stream_to: _, async: :once]
       ])
 
-      tag = @module.get_resource_tag()
+      tag = @resource_tag
       assert_resource_guard_register(ctx.resource_guard, cleanup_function, ^tag)
 
       refute_called(:hackney, :close)
@@ -361,7 +363,7 @@ defmodule Membrane.Hackney.SourceTest do
       [stream_to: _, async: :once]
     ])
 
-    tag = @module.get_resource_tag()
+    tag = @resource_tag
     assert_resource_guard_cleanup(resource_guard, ^tag)
   end
 
