@@ -110,9 +110,8 @@ defmodule Membrane.Element.Hackney.SinkTest do
 
       assert {actions, ^state} = @module.handle_end_of_stream(:input, ctx, state)
 
-      assert [response, eos] = actions |> Keyword.get_values(:notify_parent)
+      assert [response] = actions |> Keyword.get_values(:notify_parent)
       assert response == %@module.Response{status: status, headers: headers, body: body}
-      assert eos == {:end_of_stream, :input}
     end
 
     test "others", %{ctx_event: ctx} do
