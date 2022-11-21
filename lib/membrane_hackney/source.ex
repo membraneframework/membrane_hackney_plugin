@@ -13,7 +13,7 @@ defmodule Membrane.Hackney.Source do
   require Membrane.Logger
   alias Membrane.{Buffer, RemoteStream, Time}
 
-  @resource_name :hackney_soruce_resource
+  @resource_tag :hackney_soruce_resource
 
   def_output_pad :output,
     accepted_format: %RemoteStream{type: :bytestream, content_format: nil}
@@ -69,6 +69,9 @@ defmodule Membrane.Hackney.Source do
                 """,
                 default: false
               ]
+
+  @spec get_resource_tag() :: atom()
+  def get_resource_tag(), do: @resource_tag
 
   @impl true
   def handle_init(_ctx, %__MODULE__{} = options) do
@@ -277,7 +280,12 @@ defmodule Membrane.Hackney.Source do
 
     case mockable(:hackney).request(method, location, headers, body, opts) do
       {:ok, async_response} ->
-        register_resource(ctx, async_response)
+        Membrane.ResourceGuard.register(
+          ctx.resource_guard,
+          fn -> mockable(:hackney).close(async_response) end,
+          tag: @resource_tag
+        )
+
         {[], %{state | async_response: async_response, streaming: true}}
 
       {:error, reason} ->
@@ -295,19 +303,19 @@ defmodule Membrane.Hackney.Source do
   end
 
   defp close_request(ctx, state) do
-    cleanup_resource(ctx)
+    Membrane.ResourceGuard.cleanup(ctx.resource_guard, @resource_tag)
     %{state | async_response: nil, streaming: false}
   end
 
-  defp register_resource(ctx, resource) do
-    mockable(Membrane.ResourceGuard).register_resource(
-      ctx.resource_guard,
-      fn -> mockable(:hackney).close(resource) end,
-      name: @resource_name
-    )
-  end
+  # defp register_resource(ctx, resource) do
+  #   Membrane.ResourceGuard.register(
+  #     ctx.resource_guard,
+  #     fn -> mockable(:hackney).close(resource) end,
+  #     name: @resource_name
+  #   )
+  # end
 
-  defp cleanup_resource(ctx) do
-    mockable(Membrane.ResourceGuard).cleanup_resource(ctx.resource_guard, @resource_name)
-  end
+  # defp cleanup_resource(ctx) do
+  #   Membrane.ResourceGuard.cleanup(ctx.resource_guard, @resource_name)
+  # end
 end

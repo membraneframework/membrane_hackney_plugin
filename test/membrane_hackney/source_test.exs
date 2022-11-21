@@ -2,8 +2,12 @@ defmodule Membrane.Hackney.SourceTest do
   @moduledoc false
   use ExUnit.Case, async: true
   use Mockery
+
+  import Membrane.Testing.Assertions
+
   alias Membrane.Element.CallbackContext, as: Ctx
   alias Membrane.RemoteStream
+  alias Membrane.Testing.MockResourceGuard
 
   @module Membrane.Hackney.Source
 
@@ -23,7 +27,7 @@ defmodule Membrane.Hackney.SourceTest do
   }
 
   defp get_contexts(_params \\ nil) do
-    {:ok, resource_guard} = Membrane.ResourceGuard.start_link(self())
+    {:ok, resource_guard} = MockResourceGuard.start_link()
 
     ctx_fields = [
       playback: :playing,
@@ -113,7 +117,9 @@ defmodule Membrane.Hackney.SourceTest do
 
       pin_response = :mock_response
       assert_called(:hackney, :stream_next, [^pin_response])
-      assert_called(Membrane.ResourceGuard, :cleanup_resource)
+
+      tag = @module.get_resource_tag()
+      assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
     test "do nothing when next chunk from :hackney was requested" do
@@ -161,7 +167,8 @@ defmodule Membrane.Hackney.SourceTest do
                    ~r/Max.*retries.*number.*reached.*Retry.*reason.*hackney.*redirect/,
                    fn -> @module.handle_info(msg, ctx, state) end
 
-      assert_called(Membrane.ResourceGuard, :cleanup_resource)
+      tag = @module.get_resource_tag()
+      assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
     test "async status 302 should should return error and close connection", %{
@@ -175,7 +182,8 @@ defmodule Membrane.Hackney.SourceTest do
                    ~r/Max.*retries.*number.*reached.*Retry.*reason.*hackney.*redirect/,
                    fn -> @module.handle_info(msg, ctx, state) end
 
-      assert_called(Membrane.ResourceGuard, :cleanup_resource)
+      tag = @module.get_resource_tag()
+      assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
     test "async status 416 should should return error and close connection", %{
@@ -189,7 +197,8 @@ defmodule Membrane.Hackney.SourceTest do
                    ~r/Max.*retries.*number.*reached.*Retry.*reason.*hackney.*invalid_range/,
                    fn -> @module.handle_info(msg, ctx, state) end
 
-      assert_called(Membrane.ResourceGuard, :cleanup_resource)
+      tag = @module.get_resource_tag()
+      assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
     test "async status with unsupported code should return error and close connection", %{
@@ -208,7 +217,8 @@ defmodule Membrane.Hackney.SourceTest do
                      fn -> @module.handle_info(msg, ctx, state) end
       end)
 
-      assert_called(Membrane.ResourceGuard, :cleanup_resource)
+      tag = @module.get_resource_tag()
+      assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
     test "async headers should trigger redemand with streaming false", %{
@@ -265,7 +275,8 @@ defmodule Membrane.Hackney.SourceTest do
                    ~r/Max.*retries.*number.*reached.*Retry.*reason.*hackney.*reason/,
                    fn -> @module.handle_info(msg, ctx, state) end
 
-      assert_called(Membrane.ResourceGuard, :cleanup_resource)
+      tag = @module.get_resource_tag()
+      assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
     test "async redirect should change location and start create new request", %{
@@ -297,6 +308,15 @@ defmodule Membrane.Hackney.SourceTest do
         "body",
         [opt: :some, stream_to: _, async: :once]
       ])
+
+      tag = @module.get_resource_tag()
+      assert_resource_guard_register(ctx.resource_guard, cleanup_function, ^tag)
+
+      refute_called(:hackney, :close)
+
+      cleanup_function.()
+
+      assert_called(:hackney, :close, [^second_response])
     end
   end
 
@@ -319,7 +339,7 @@ defmodule Membrane.Hackney.SourceTest do
     ] ++ get_contexts()
   end
 
-  defp test_reconnect(ctx, tested_call) do
+  defp test_reconnect(ctx, resource_guard, tested_call) do
     %{
       second_response: second_response,
       state: state,
@@ -341,7 +361,8 @@ defmodule Membrane.Hackney.SourceTest do
       [stream_to: _, async: :once]
     ])
 
-    assert_called(Membrane.ResourceGuard, :cleanup_resource)
+    tag = @module.get_resource_tag()
+    assert_resource_guard_cleanup(resource_guard, ^tag)
   end
 
   describe "with max_retries = 1 in options" do
@@ -351,7 +372,7 @@ defmodule Membrane.Hackney.SourceTest do
          %{ctx_demand: ctx_demand} = test_ctx do
       mock(:hackney, [stream_next: 1], {:error, :reason})
 
-      test_reconnect(test_ctx, fn state ->
+      test_reconnect(test_ctx, ctx_demand.resource_guard, fn state ->
         @module.handle_demand(:output, 42, :bytes, ctx_demand, state)
       end)
 
@@ -392,7 +413,7 @@ defmodule Membrane.Hackney.SourceTest do
     test "handle_demand should reconnect on error", %{ctx_demand: ctx_demand} = test_ctx do
       mock(:hackney, [stream_next: 1], {:error, :reason})
 
-      test_reconnect(test_ctx, fn state ->
+      test_reconnect(test_ctx, ctx_demand.resource_guard, fn state ->
         @module.handle_demand(:output, 42, :bytes, ctx_demand, state)
       end)
 

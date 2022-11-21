@@ -2,8 +2,11 @@ defmodule Membrane.Element.Hackney.SinkTest do
   use ExUnit.Case, async: true
   use Mockery
 
+  import Membrane.Testing.Assertions
+
   alias Membrane.Buffer
   alias Membrane.Element.CallbackContext, as: Ctx
+  alias Membrane.Testing.MockResourceGuard
 
   @module Membrane.Hackney.Sink
 
@@ -12,7 +15,7 @@ defmodule Membrane.Element.Hackney.SinkTest do
   @mock_payload "payload!"
 
   defp get_contexts(_params) do
-    {:ok, resource_guard} = Membrane.ResourceGuard.start_link(self())
+    {:ok, resource_guard} = MockResourceGuard.start_link()
 
     ctx_fields = [
       playback: :playing,
@@ -57,6 +60,7 @@ defmodule Membrane.Element.Hackney.SinkTest do
 
   test "Moving to playing state", %{ctx_playing: ctx} do
     mock(:hackney, [request: 5], {:ok, @mock_conn_ref})
+    mock(:hackney, close: 1)
 
     assert {actions, new_state} = @module.handle_playing(ctx, initial_state())
 
@@ -65,7 +69,17 @@ defmodule Membrane.Element.Hackney.SinkTest do
 
     assert new_state.conn_ref == @mock_conn_ref
 
-    assert_called(Membrane.ResourceGuard, :register_resource)
+    assert_resource_guard_register(
+      ctx.resource_guard,
+      cleanup_function,
+      {:conn_ref, @mock_conn_ref}
+    )
+
+    refute_called(:hackeny, :close)
+
+    cleanup_function.()
+
+    assert_called(:hackney, :close, [@mock_conn_ref])
   end
 
   test "handling incoming buffers", %{ctx_write: ctx} do

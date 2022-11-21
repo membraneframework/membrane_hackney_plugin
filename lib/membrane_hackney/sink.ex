@@ -73,9 +73,11 @@ defmodule Membrane.Hackney.Sink do
         state.hackney_opts
       )
 
-    mockable(ResourceGuard).register_resource(ctx.resource_guard, fn ->
-      mockable(:hackney).close(conn_ref)
-    end)
+    ResourceGuard.register(
+      ctx.resource_guard,
+      fn -> mockable(:hackney).close(conn_ref) end,
+      tag: {:conn_ref, conn_ref}
+    )
 
     {[demand: {:input, state.demand_size}], %{state | conn_ref: conn_ref}}
   end
