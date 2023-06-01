@@ -187,7 +187,7 @@ defmodule Membrane.Hackney.Source do
 
   def handle_info(
         {:hackney_response, id, chunk},
-        %Ctx.Info{playback: :playing},
+        %{playback: :playing},
         %{async_response: id} = state
       )
       when is_binary(chunk) do

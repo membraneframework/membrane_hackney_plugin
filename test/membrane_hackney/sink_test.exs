@@ -5,7 +5,6 @@ defmodule Membrane.Element.Hackney.SinkTest do
   import Membrane.Testing.Assertions
 
   alias Membrane.Buffer
-  alias Membrane.Element.CallbackContext, as: Ctx
   alias Membrane.Testing.MockResourceGuard
 
   @module Membrane.Hackney.Sink
@@ -17,7 +16,7 @@ defmodule Membrane.Element.Hackney.SinkTest do
   defp get_contexts(_params) do
     {:ok, resource_guard} = MockResourceGuard.start_link()
 
-    ctx_fields = [
+    ctx = %{
       playback: :playing,
       pads: %{},
       clock: nil,
@@ -25,16 +24,15 @@ defmodule Membrane.Element.Hackney.SinkTest do
       resource_guard: resource_guard,
       utility_supervisor: :mock_utility_supervisor,
       name: :source
-    ]
+    }
 
     [
-      ctx_write: Ctx.Write,
-      ctx_playing: Ctx.Playing,
-      ctx_init: Ctx.Init,
-      ctx_end_of_stream: Ctx.StreamManagement,
-      ctx_event: Ctx.Event
+      ctx_write: ctx,
+      ctx_playing: ctx,
+      ctx_init: ctx,
+      ctx_end_of_stream: ctx,
+      ctx_event: ctx
     ]
-    |> Bunch.KVList.map_values(&struct(&1, ctx_fields))
   end
 
   setup :get_contexts

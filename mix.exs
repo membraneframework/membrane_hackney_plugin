@@ -38,7 +38,7 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
 
   defp deps do
     [
-      {:membrane_core, "~> 0.11.0"},
+      {:membrane_core, "~> 0.12.0"},
       {:hackney, "~> 1.16"},
       {:mockery, "~> 2.3", runtime: false},
       {:ex_doc, "~> 0.28", only: :dev, runtime: false},
