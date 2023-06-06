@@ -5,7 +5,6 @@ defmodule Membrane.Hackney.SourceTest do
 
   import Membrane.Testing.Assertions
 
-  alias Membrane.Element.CallbackContext, as: Ctx
   alias Membrane.RemoteStream
   alias Membrane.Testing.MockResourceGuard
 
@@ -31,7 +30,7 @@ defmodule Membrane.Hackney.SourceTest do
   defp get_contexts(_params \\ nil) do
     {:ok, resource_guard} = MockResourceGuard.start_link()
 
-    ctx_fields = [
+    ctx = %{
       playback: :playing,
       pads: %{},
       clock: nil,
@@ -39,12 +38,12 @@ defmodule Membrane.Hackney.SourceTest do
       resource_guard: resource_guard,
       utility_supervisor: :mock_utility_supervisor,
       name: :source
-    ]
+    }
 
     [
-      ctx_info: struct!(Ctx.Info, ctx_fields),
-      ctx_playing: struct!(Ctx.Playing, ctx_fields),
-      ctx_demand: struct!(Ctx.Demand, [incoming_demand: 1] ++ ctx_fields)
+      ctx_info: ctx,
+      ctx_playing: ctx,
+      ctx_demand: Map.put(ctx, :incoming_demand, 1)
     ]
   end
 
