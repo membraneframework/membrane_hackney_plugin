@@ -104,14 +104,14 @@ defmodule Membrane.Hackney.Source do
   end
 
   def handle_demand(:output, _size, _unit, ctx, state) do
-    Membrane.Logger.debug("Hackney: requesting next chunk")
+    Membrane.Logger.debug_verbose("Hackney: requesting next chunk")
 
     case state.async_response |> mockable(:hackney).stream_next() do
       :ok ->
         {[], %{state | streaming: true}}
 
       {:error, reason} ->
-        Membrane.Logger.warn("Hackney.stream_next/1 error: #{inspect(reason)}")
+        Membrane.Logger.warning("Hackney.stream_next/1 error: #{inspect(reason)}")
 
         # Error here is rather caused by library error,
         # so we retry without delay - we will either sucessfully reconnect
@@ -123,7 +123,7 @@ defmodule Membrane.Hackney.Source do
   @impl true
   def handle_info({:hackney_response, msg_id, msg}, _ctx, %{async_response: id} = state)
       when msg_id != id do
-    Membrane.Logger.warn(
+    Membrane.Logger.warning(
       "Ignoring message #{inspect(msg)} because it does not match current response id: #{inspect(id)}"
     )
 
@@ -136,7 +136,7 @@ defmodule Membrane.Hackney.Source do
         %{async_response: id} = state
       )
       when code in [200, 206] do
-    Membrane.Logger.debug("Hackney: Got #{code} #{desc}")
+    Membrane.Logger.debug_verbose("Hackney: Got #{code} #{desc}")
     {[redemand: :output], %{state | streaming: false, retries: 0}}
   end
 
@@ -146,7 +146,7 @@ defmodule Membrane.Hackney.Source do
         %{async_response: id} = state
       )
       when code in [301, 302] do
-    Membrane.Logger.warn("""
+    Membrane.Logger.warning("""
     Got #{inspect(code)} status indicating redirection.
     If you want to follow add `follow_redirect: true` to :poison_opts
     """)
@@ -159,7 +159,7 @@ defmodule Membrane.Hackney.Source do
         ctx,
         %{async_response: id} = state
       ) do
-    Membrane.Logger.warn(
+    Membrane.Logger.warning(
       "Hackney: Got 416 Invalid Range (pos_counter is #{inspect(state.pos_counter)})"
     )
 
@@ -171,7 +171,7 @@ defmodule Membrane.Hackney.Source do
         ctx,
         %{async_response: id} = state
       ) do
-    Membrane.Logger.warn("Hackney: Got unexpected status code #{code}")
+    Membrane.Logger.warning("Hackney: Got unexpected status code #{code}")
     retry({:http_code, code}, ctx, close_request(ctx, state))
   end
 
@@ -180,7 +180,7 @@ defmodule Membrane.Hackney.Source do
         _ctx,
         %{async_response: id} = state
       ) do
-    Membrane.Logger.debug("Hackney: Got headers #{inspect(headers)}")
+    Membrane.Logger.debug_verbose("Hackney: Got headers #{inspect(headers)}")
 
     {[redemand: :output], %{state | streaming: false}}
   end
@@ -206,13 +206,12 @@ defmodule Membrane.Hackney.Source do
   end
 
   def handle_info({:hackney_response, id, :done}, _ctx, %{async_response: id} = state) do
-    Membrane.Logger.info("Hackney EOS")
     new_state = %{state | streaming: false, async_response: nil}
     {[end_of_stream: :output], new_state}
   end
 
   def handle_info({:hackney_response, id, {:error, reason}}, ctx, %{async_response: id} = state) do
-    Membrane.Logger.warn("Hackney error #{inspect(reason)}")
+    Membrane.Logger.warning("Hackney error #{inspect(reason)}")
 
     retry({:hackney, reason}, ctx, close_request(ctx, state))
   end
@@ -286,7 +285,7 @@ defmodule Membrane.Hackney.Source do
         {[], %{state | async_response: async_response, streaming: true}}
 
       {:error, reason} ->
-        Membrane.Logger.warn("""
+        Membrane.Logger.warning("""
         Error while making a request #{inspect({method, location, body, headers, opts})},
         reason #{inspect(reason)}
         """)
