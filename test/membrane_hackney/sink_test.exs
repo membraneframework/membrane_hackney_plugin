@@ -86,7 +86,7 @@ defmodule Membrane.Element.Hackney.SinkTest do
     state = playing_state()
 
     assert {actions, ^state} =
-             @module.handle_write(:input, %Buffer{payload: @mock_payload}, ctx, state)
+             @module.handle_buffer(:input, %Buffer{payload: @mock_payload}, ctx, state)
 
     assert [demand: {:input, demand}] = actions
     assert demand > 0

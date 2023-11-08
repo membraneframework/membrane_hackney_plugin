@@ -16,7 +16,8 @@ defmodule Membrane.Hackney.Source do
   @resource_tag :hackney_source_resource
 
   def_output_pad :output,
-    accepted_format: %RemoteStream{type: :bytestream, content_format: nil}
+    accepted_format: %RemoteStream{type: :bytestream, content_format: nil},
+    flow_control: :manual
 
   def_options location: [
                 type: :string,
@@ -245,8 +246,7 @@ defmodule Membrane.Hackney.Source do
   end
 
   defp retry(_reason, _ctx, %{retry_delay: delay, retries: retries} = state, true) do
-    delay_miliseconds = Time.round_to_timebase(delay, Time.millisecond())
-    Process.send_after(self(), :reconnect, delay_miliseconds)
+    Process.send_after(self(), :reconnect, Time.as_milliseconds(delay, :round))
     {[], %{state | retries: retries + 1}}
   end
 
