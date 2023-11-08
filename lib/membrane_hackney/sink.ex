@@ -9,7 +9,7 @@ defmodule Membrane.Hackney.Sink do
   alias Membrane.Buffer
   alias Membrane.ResourceGuard
 
-  def_input_pad :input, accepted_format: _any, demand_unit: :bytes
+  def_input_pad :input, accepted_format: _any, flow_control: :manual, demand_unit: :bytes
 
   def_options location: [
                 type: :string,
@@ -83,7 +83,7 @@ defmodule Membrane.Hackney.Sink do
   end
 
   @impl true
-  def handle_write(:input, %Buffer{payload: payload}, _ctx, state) do
+  def handle_buffer(:input, %Buffer{payload: payload}, _ctx, state) do
     mockable(:hackney).send_body(state.conn_ref, payload)
     {[demand: {:input, state.demand_size}], state}
   end
