@@ -6,6 +6,7 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
 
   def project do
     [
+      homepage_url: "https://membrane.stream",
       app: :membrane_hackney_plugin,
       version: @version,
       elixir: "~> 1.12",
