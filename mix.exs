@@ -6,7 +6,6 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
 
   def project do
     [
-      homepage_url: "https://membrane.stream",
       app: :membrane_hackney_plugin,
       version: @version,
       elixir: "~> 1.12",
@@ -22,6 +21,7 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
       name: "Membrane Hackney plugin",
       source_url: @github_url,
       docs: docs(),
+      homepage_url: "https://membrane.stream",
 
       # others
       dialyzer: [flags: [:error_handling, :underspecs]]
