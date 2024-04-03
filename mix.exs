@@ -21,6 +21,7 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
       name: "Membrane Hackney plugin",
       source_url: @github_url,
       docs: docs(),
+      homepage_url: "https://membrane.stream",
 
       # others
       dialyzer: [flags: [:error_handling, :underspecs]]
