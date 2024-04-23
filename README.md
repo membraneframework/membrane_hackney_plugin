@@ -24,30 +24,26 @@ This pipeline should get you a kitten from imgur and save as `kitty.jpg`. To run
 [`:membrane_file_plugin`](https://github.com/membraneframework/membrane_file_plugin) in your project's dependencies.
 
 ```elixir
+Mix.install(membrane_hackney_plugin: "~> 0.11.0", membrane_file_plugin: "~> 0.17.0")
+
 defmodule DownloadPipeline do
   use Membrane.Pipeline
   alias Membrane.{File, Hackney}
 
   @impl true
-  def handle_init(_) do
-    children = [
-      source: %Hackney.Source{
+  def handle_init(_ctx, _opts) do
+    spec = 
+      child(:source, %Hackney.Source{
         location: "http://i.imgur.com/z4d4kWk.jpg",
         hackney_opts: [follow_redirect: true]
-      },
-      sink: %File.Sink{location: "kitty.jpg"}
-    ]
+      })
+      |> child(:sink, %File.Sink{location: "kitty.jpg"})
 
-    links = [link(:source) |> to(:sink)]
-
-    spec = %ParentSpec{children: children, links: links}
-
-    {{:ok, spec: spec}, %{}}
+    {[spec: spec], %{}}
   end
 end
 
-{:ok, pid} = DownloadPipeline.start_link()
-DownloadPipeline.play(pid)
+{:ok, _supervisor_pid, _pipeline_pid} = Membrane.Pipeline.start_link(DownloadPipeline, [])
 ```
 
 ### Membrane.Hackney.Sink
@@ -56,40 +52,38 @@ The following pipeline is an example of file upload - it requires [Goth](https:/
 properly configured credentials for Google Cloud and [`:membrane_file_plugin`](https://github.com/membraneframework/membrane_file_plugin) in your project's dependencies.
 
 ```elixir
+Mix.install(membrane_hackney_plugin: "~> 0.11.0", membrane_file_plugin: "~> 0.17.0", goth: "~> 1.0")
+
 defmodule UploadPipeline do
   use Membrane.Pipeline
 
   alias Membrane.{File, Hackney}
 
   @impl true
-  def handle_init([bucket, name]) do
-    children = [
-      source: %File.Source{location: "sample.flac"},
-      sink: %Hackney.Sink{
+  def handle_init(_ctx, [bucket, name]) do
+    spec = 
+      child(:source, %File.Source{location: "sample.flac"})
+      |> child(:sink, %Hackney.Sink{
         method: :post,
         location: build_uri(bucket, name),
         headers: [auth_header(), {"content-type", "audio/flac"}]
-      }
-    ]
+      })
 
-    links = [link(:source) |> to(:sink)]
-
-    spec = %ParentSpec{children: children, links: links}
-
-    {{:ok, spec: spec}, %{}}
+    {[spec: spec], %{}}
   end
 
   @impl true
-  def handle_notification(%Hackney.Sink.Response{} = response, from, _ctx, state) do
+  def handle_child_notification(%Hackney.Sink.Response{} = response, from, _ctx, state) do
     IO.inspect({from, response})
     {:ok, state}
   end
 
-  def handle_notification(_notification, _from, _ctx, state) do
+  @impl true
+  def handle_child_notification(_notification, _from, _ctx, state) do
     {:ok, state}
   end
 
-  defp auth_header do
+  defp auth_header() do
     {:ok, token} = Goth.Token.for_scope("https://www.googleapis.com/auth/devstorage.read_write")
     {"Authorization", "#{token.type} #{token.token}"}
   end
@@ -100,8 +94,8 @@ defmodule UploadPipeline do
   end
 end
 
-{:ok, pid} = UploadPipeline.start_link(["some_bucket", "uploaded_file_name.flac"])
-UploadPipeline.play(pid)
+pipeline_opts = ["some_bucket", "uploaded_file_name.flac"]
+{:ok, _supervisor_pid, _pipeline_pid} = Membrane.Pipeline.start_link(UploadPipeline, pipeline_opts)
 ```
 
 ## Sponsors
