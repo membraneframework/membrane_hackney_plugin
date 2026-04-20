@@ -73,11 +73,11 @@ defmodule Membrane.Element.Hackney.SinkTest do
       {:conn_ref, @mock_conn_ref}
     )
 
-    refute_called(:hackeny, :close)
+    refute_called!(:hackeny, :close)
 
     cleanup_function.()
 
-    assert_called(:hackney, :close, [@mock_conn_ref])
+    assert_called!(:hackney, :close, args: [@mock_conn_ref])
   end
 
   test "handling incoming buffers", %{ctx_write: ctx} do
@@ -93,7 +93,7 @@ defmodule Membrane.Element.Hackney.SinkTest do
 
     conn_ref = @mock_conn_ref
     payload = @mock_payload
-    assert_called(:hackney, :send_body, [^conn_ref, ^payload])
+    assert_called!(:hackney, :send_body, args: [^conn_ref, ^payload])
   end
 
   describe "event handling:" do
