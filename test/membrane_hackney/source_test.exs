@@ -83,13 +83,15 @@ defmodule Membrane.Hackney.SourceTest do
     assert new_state.async_response == :mock_response
     assert new_state.streaming == true
 
-    assert_called!(:hackney, :request, args: [
-      :get,
-      "url",
-      [:hd],
-      "body",
-      [opt: :some, stream_to: _, async: :once]
-    ])
+    assert_called!(:hackney, :request,
+      args: [
+        :get,
+        "url",
+        [:hd],
+        "body",
+        [opt: :some, stream_to: _, async: :once]
+      ]
+    )
 
     tag = @resource_tag
     assert_resource_guard_register(ctx.resource_guard, cleanup_function, ^tag)
@@ -312,13 +314,15 @@ defmodule Membrane.Hackney.SourceTest do
       assert new_state.async_response == second_response
       assert new_state.streaming == true
 
-      assert_called!(:hackney, :request, args: [
-        :get,
-        "url2",
-        [:hd],
-        "body",
-        [opt: :some, stream_to: _, async: :once]
-      ])
+      assert_called!(:hackney, :request,
+        args: [
+          :get,
+          "url2",
+          [:hd],
+          "body",
+          [opt: :some, stream_to: _, async: :once]
+        ]
+      )
 
       tag = @resource_tag
       assert_resource_guard_register(ctx.resource_guard, cleanup_function, ^tag)
@@ -364,13 +368,15 @@ defmodule Membrane.Hackney.SourceTest do
     assert new_state.async_response == second_response
     assert new_state.streaming == true
 
-    assert_called!(:hackney, :request, args: [
-      :get,
-      "url",
-      ^expected_headers,
-      "",
-      [stream_to: _, async: :once]
-    ])
+    assert_called!(:hackney, :request,
+      args: [
+        :get,
+        "url",
+        ^expected_headers,
+        "",
+        [stream_to: _, async: :once]
+      ]
+    )
 
     tag = @resource_tag
     assert_resource_guard_cleanup(resource_guard, ^tag)
