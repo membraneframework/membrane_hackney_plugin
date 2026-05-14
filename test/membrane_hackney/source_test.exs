@@ -61,7 +61,7 @@ defmodule Membrane.Hackney.SourceTest do
   test "handle_setup should do nothing" do
     mock(:hackney, close: 1)
     assert @module.handle_setup(:stopped, @default_state) == {[], @default_state}
-    refute_called(:hackney, :close)
+    refute_called!(:hackney, :close)
   end
 
   test "handle_playing/2 should start an async request" do
@@ -83,22 +83,24 @@ defmodule Membrane.Hackney.SourceTest do
     assert new_state.async_response == :mock_response
     assert new_state.streaming == true
 
-    assert_called(:hackney, :request, [
-      :get,
-      "url",
-      [:hd],
-      "body",
-      [opt: :some, stream_to: _, async: :once]
-    ])
+    assert_called!(:hackney, :request,
+      args: [
+        :get,
+        "url",
+        [:hd],
+        "body",
+        [opt: :some, stream_to: _, async: :once]
+      ]
+    )
 
     tag = @resource_tag
     assert_resource_guard_register(ctx.resource_guard, cleanup_function, ^tag)
 
-    refute_called(:hackney, :close)
+    refute_called!(:hackney, :close)
 
     cleanup_function.()
 
-    assert_called(:hackney, :close, [:mock_response])
+    assert_called!(:hackney, :close, args: [:mock_response])
   end
 
   describe "handle_demand/5 should" do
@@ -114,7 +116,7 @@ defmodule Membrane.Hackney.SourceTest do
 
       pin_response = :mock_response
 
-      assert_called(:hackney, :stream_next, [^pin_response])
+      assert_called!(:hackney, :stream_next, args: [^pin_response])
     end
 
     test "return error when stream_next fails", %{ctx_demand: ctx} do
@@ -127,7 +129,7 @@ defmodule Membrane.Hackney.SourceTest do
                    fn -> @module.handle_demand(:output, 42, :bytes, ctx, state) end
 
       pin_response = :mock_response
-      assert_called(:hackney, :stream_next, [^pin_response])
+      assert_called!(:hackney, :stream_next, args: [^pin_response])
 
       tag = @resource_tag
       assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
@@ -138,7 +140,7 @@ defmodule Membrane.Hackney.SourceTest do
       mock(:hackney, [stream_next: 1], {:ok, :mock_response})
 
       assert @module.handle_demand(:output, 42, :bytes, nil, state) == {[], state}
-      refute_called(:hackney, :stream_next)
+      refute_called!(:hackney, :stream_next)
     end
   end
 
@@ -312,22 +314,24 @@ defmodule Membrane.Hackney.SourceTest do
       assert new_state.async_response == second_response
       assert new_state.streaming == true
 
-      assert_called(:hackney, :request, [
-        :get,
-        "url2",
-        [:hd],
-        "body",
-        [opt: :some, stream_to: _, async: :once]
-      ])
+      assert_called!(:hackney, :request,
+        args: [
+          :get,
+          "url2",
+          [:hd],
+          "body",
+          [opt: :some, stream_to: _, async: :once]
+        ]
+      )
 
       tag = @resource_tag
       assert_resource_guard_register(ctx.resource_guard, cleanup_function, ^tag)
 
-      refute_called(:hackney, :close)
+      refute_called!(:hackney, :close)
 
       cleanup_function.()
 
-      assert_called(:hackney, :close, [^second_response])
+      assert_called!(:hackney, :close, args: [^second_response])
     end
   end
 
@@ -364,23 +368,25 @@ defmodule Membrane.Hackney.SourceTest do
     assert new_state.async_response == second_response
     assert new_state.streaming == true
 
-    assert_called(:hackney, :request, [
-      :get,
-      "url",
-      ^expected_headers,
-      "",
-      [stream_to: _, async: :once]
-    ])
+    assert_called!(:hackney, :request,
+      args: [
+        :get,
+        "url",
+        ^expected_headers,
+        "",
+        [stream_to: _, async: :once]
+      ]
+    )
 
     tag = @resource_tag
     assert_resource_guard_cleanup(resource_guard, ^tag)
     assert_resource_guard_register(resource_guard, cleanup_function, ^tag)
 
-    refute_called(:hackney, :close)
+    refute_called!(:hackney, :close)
 
     cleanup_function.()
 
-    assert_called(:hackney, :close, [^second_response])
+    assert_called!(:hackney, :close, args: [^second_response])
   end
 
   describe "with max_retries = 1 in options" do
@@ -394,7 +400,7 @@ defmodule Membrane.Hackney.SourceTest do
         @module.handle_demand(:output, 42, :bytes, ctx_demand, state)
       end)
 
-      assert_called(:hackney, :stream_next, [:mock_response])
+      assert_called!(:hackney, :stream_next, args: [:mock_response])
     end
 
     test "handle_info should send :reconnect on error", %{state: state, ctx_info: ctx} do
@@ -437,7 +443,7 @@ defmodule Membrane.Hackney.SourceTest do
 
       # trick to overcome Mockery limitations
       pin_response = :mock_response
-      assert_called(:hackney, :stream_next, [^pin_response])
+      assert_called!(:hackney, :stream_next, args: [^pin_response])
     end
 
     test "handle_info", %{state: state, ctx_info: ctx} do

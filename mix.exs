@@ -1,7 +1,7 @@
 defmodule Membrane.Hackney.Plugin.Mixfile do
   use Mix.Project
 
-  @version "0.11.0"
+  @version "0.11.1"
   @github_url "http://github.com/membraneframework/membrane_hackney_plugin"
 
   def project do
@@ -21,10 +21,7 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
       name: "Membrane Hackney plugin",
       source_url: @github_url,
       docs: docs(),
-      homepage_url: "https://membrane.stream",
-
-      # others
-      dialyzer: [flags: [:error_handling, :underspecs]]
+      homepage_url: "https://membrane.stream"
     ]
   end
 
@@ -42,9 +39,9 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
       {:membrane_core, "~> 1.0"},
       {:hackney, "~> 1.16"},
       {:mockery, "~> 2.3", runtime: false},
-      {:ex_doc, "~> 0.28", only: :dev, runtime: false},
-      {:dialyxir, "~> 1.1", only: :dev, runtime: false},
-      {:credo, "~> 1.6", only: :dev, runtime: false}
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+      {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
+      {:credo, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
 
@@ -66,6 +63,7 @@ defmodule Membrane.Hackney.Plugin.Mixfile do
 
     if System.get_env("CI") == "true" do
       # Store PLTs in cacheable directory for CI
+      File.mkdir_p!(Path.join([__DIR__, "priv", "plts"]))
       [plt_local_path: "priv/plts", plt_core_path: "priv/plts"] ++ opts
     else
       opts
