@@ -90,6 +90,7 @@ defmodule Membrane.Hackney.Sink do
 
   @impl true
   def handle_end_of_stream(:input, _ctx, %{conn_ref: conn_ref} = state) do
+    :ok = mockable(:hackney).finish_send_body(conn_ref)
     {:ok, status, headers, conn_ref} = mockable(:hackney).start_response(conn_ref)
     {:ok, body} = mockable(:hackney).body(conn_ref)
 

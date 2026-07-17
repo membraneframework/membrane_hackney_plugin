@@ -1,7 +1,7 @@
 defmodule Membrane.Hackney.Plugin.Mixfile do
   use Mix.Project
 
-  @version "0.11.2"
+  @version "0.11.3"
   @github_url "http://github.com/membraneframework/membrane_hackney_plugin"
 
   def project do

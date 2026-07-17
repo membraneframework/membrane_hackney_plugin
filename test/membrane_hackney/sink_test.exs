@@ -103,6 +103,7 @@ defmodule Membrane.Element.Hackney.SinkTest do
       body = "body"
       state = playing_state()
 
+      mock(:hackney, [finish_send_body: 1], :ok)
       mock(:hackney, [start_response: 1], {:ok, status, headers, @mock_conn_ref})
       mock(:hackney, [body: 1], {:ok, body})
 
@@ -110,6 +111,9 @@ defmodule Membrane.Element.Hackney.SinkTest do
 
       assert [response] = actions |> Keyword.get_values(:notify_parent)
       assert response == %@module.Response{status: status, headers: headers, body: body}
+
+      conn_ref = @mock_conn_ref
+      assert_called!(:hackney, :finish_send_body, args: [^conn_ref])
     end
 
     test "others", %{ctx_event: ctx} do

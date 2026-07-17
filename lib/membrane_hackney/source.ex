@@ -77,6 +77,7 @@ defmodule Membrane.Hackney.Source do
       options
       |> Map.merge(%{
         async_response: nil,
+        conn_monitor: nil,
         retries: 0,
         streaming: false,
         pos_counter: 0
@@ -104,21 +105,10 @@ defmodule Membrane.Hackney.Source do
     {[], state}
   end
 
-  def handle_demand(:output, _size, _unit, ctx, state) do
+  def handle_demand(:output, _size, _unit, _ctx, state) do
     Membrane.Logger.debug_verbose("Hackney: requesting next chunk")
-
-    case state.async_response |> mockable(:hackney).stream_next() do
-      :ok ->
-        {[], %{state | streaming: true}}
-
-      {:error, reason} ->
-        Membrane.Logger.warning("Hackney.stream_next/1 error: #{inspect(reason)}")
-
-        # Error here is rather caused by library error,
-        # so we retry without delay - we will either sucessfully reconnect
-        # or will get an error resulting in retry with delay
-        retry({:stream_next, reason}, ctx, close_request(ctx, state), false)
-    end
+    :ok = state.async_response |> mockable(:hackney).stream_next()
+    {[], %{state | streaming: true}}
   end
 
   @impl true
@@ -206,9 +196,8 @@ defmodule Membrane.Hackney.Source do
     {[], %{state | streaming: false}}
   end
 
-  def handle_info({:hackney_response, id, :done}, _ctx, %{async_response: id} = state) do
-    new_state = %{state | streaming: false, async_response: nil}
-    {[end_of_stream: :output], new_state}
+  def handle_info({:hackney_response, id, :done}, ctx, %{async_response: id} = state) do
+    {[end_of_stream: :output], close_request(ctx, state)}
   end
 
   def handle_info({:hackney_response, id, {:error, reason}}, ctx, %{async_response: id} = state) do
@@ -230,22 +219,36 @@ defmodule Membrane.Hackney.Source do
     connect(ctx, state)
   end
 
+  def handle_info({:DOWN, monitor, :process, _pid, reason}, ctx, %{conn_monitor: monitor} = state) do
+    Membrane.Logger.warning("Hackney connection process died, reason: #{inspect(reason)}")
+    state = close_request(ctx, state)
+
+    # Death of the connection process is rather caused by a library error,
+    # so we retry without delay - we will either successfully reconnect
+    # or get an error resulting in a retry with delay
+    retry({:hackney, {:connection_down, reason}}, ctx, state, false)
+  end
+
+  def handle_info({:DOWN, _monitor, :process, _pid, _reason}, _ctx, state) do
+    {[], state}
+  end
+
   def handle_info(:reconnect, ctx, state) do
     connect(ctx, state)
   end
 
   defp retry(reason, ctx, state, delay? \\ true)
 
-  defp retry(reason, _ctx, %{retries: retries, max_retries: max_retries}, _delay)
+  defp retry(reason, _ctx, %{retries: retries, max_retries: max_retries}, _delay?)
        when retries >= max_retries do
     raise "Error: Max retries number reached. Retry reason: #{inspect(reason)}"
   end
 
-  defp retry(_reason, ctx, state, false) do
+  defp retry(_reason, ctx, state, false = _delay?) do
     connect(ctx, %{state | retries: state.retries + 1})
   end
 
-  defp retry(_reason, _ctx, %{retry_delay: delay, retries: retries} = state, true) do
+  defp retry(_reason, _ctx, %{retry_delay: delay, retries: retries} = state, true = _delay?) do
     Process.send_after(self(), :reconnect, Time.as_milliseconds(delay, :round))
     {[], %{state | retries: retries + 1}}
   end
@@ -276,13 +279,23 @@ defmodule Membrane.Hackney.Source do
 
     case mockable(:hackney).request(method, location, headers, body, opts) do
       {:ok, async_response} ->
-        Membrane.ResourceGuard.register(
-          ctx.resource_guard,
-          fn -> mockable(:hackney).close(async_response) end,
-          tag: @resource_tag
-        )
+        close_conn = fn ->
+          # The connection may be dead already
+          try do
+            mockable(:hackney).close(async_response)
+          catch
+            _error -> :ok
+          end
+        end
 
-        {[], %{state | async_response: async_response, streaming: true}}
+        Membrane.ResourceGuard.register(ctx.resource_guard, close_conn, tag: @resource_tag)
+
+        # The connection never notifies us if it dies before delivering
+        # a response message, so we need to monitor it ourselves
+        conn_monitor = Process.monitor(async_response)
+
+        {[],
+         %{state | async_response: async_response, conn_monitor: conn_monitor, streaming: true}}
 
       {:error, reason} ->
         Membrane.Logger.warning("""
@@ -290,7 +303,7 @@ defmodule Membrane.Hackney.Source do
         reason #{inspect(reason)}
         """)
 
-        retry({:haceney, reason}, ctx, state)
+        retry({:hackney, reason}, ctx, state)
     end
   end
 
@@ -300,6 +313,7 @@ defmodule Membrane.Hackney.Source do
 
   defp close_request(ctx, state) do
     Membrane.ResourceGuard.cleanup(ctx.resource_guard, @resource_tag)
-    %{state | async_response: nil, streaming: false}
+    if state.conn_monitor, do: Process.demonitor(state.conn_monitor, [:flush])
+    %{state | async_response: nil, conn_monitor: nil, streaming: false}
   end
 end
