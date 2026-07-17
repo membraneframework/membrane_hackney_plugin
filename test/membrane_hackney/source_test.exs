@@ -23,6 +23,7 @@ defmodule Membrane.Hackney.SourceTest do
     max_retries: 0,
     retry_delay: Membrane.Time.millisecond(),
     async_response: nil,
+    conn_monitor: nil,
     streaming: false,
     pos_counter: 0
   }
@@ -117,22 +118,6 @@ defmodule Membrane.Hackney.SourceTest do
       pin_response = :mock_response
 
       assert_called!(:hackney, :stream_next, args: [^pin_response])
-    end
-
-    test "return error when stream_next fails", %{ctx_demand: ctx} do
-      state = %{@default_state | async_response: :mock_response}
-      mock(:hackney, [stream_next: 1], {:error, :reason})
-      mock(:hackney, close: 1)
-
-      assert_raise RuntimeError,
-                   ~r/Max.*retries.*number.*reached.*Retry.*reason.*stream_next.*reason/,
-                   fn -> @module.handle_demand(:output, 42, :bytes, ctx, state) end
-
-      pin_response = :mock_response
-      assert_called!(:hackney, :stream_next, args: [^pin_response])
-
-      tag = @resource_tag
-      assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
     test "do nothing when next chunk from :hackney was requested" do
@@ -379,7 +364,6 @@ defmodule Membrane.Hackney.SourceTest do
     )
 
     tag = @resource_tag
-    assert_resource_guard_cleanup(resource_guard, ^tag)
     assert_resource_guard_register(resource_guard, cleanup_function, ^tag)
 
     refute_called!(:hackney, :close)
@@ -392,15 +376,11 @@ defmodule Membrane.Hackney.SourceTest do
   describe "with max_retries = 1 in options" do
     setup :state_resume_not_live
 
-    test "handle_demand should reconnect on error starting from current position",
-         %{ctx_demand: ctx_demand} = test_ctx do
-      mock(:hackney, [stream_next: 1], {:error, :reason})
-
-      test_reconnect(test_ctx, ctx_demand.resource_guard, fn state ->
-        @module.handle_demand(:output, 42, :bytes, ctx_demand, state)
+    test "handle_info :reconnect should reconnect starting from current position",
+         %{ctx_info: ctx} = test_ctx do
+      test_reconnect(test_ctx, ctx.resource_guard, fn state ->
+        @module.handle_info(:reconnect, ctx, state)
       end)
-
-      assert_called!(:hackney, :stream_next, args: [:mock_response])
     end
 
     test "handle_info should send :reconnect on error", %{state: state, ctx_info: ctx} do
@@ -409,6 +389,31 @@ defmodule Membrane.Hackney.SourceTest do
       assert {[], new_state} = @module.handle_info(msg, ctx, state)
       assert new_state.retries == state.retries + 1
       assert_receive :reconnect
+
+      tag = @resource_tag
+      assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
+    end
+
+    test "handle_info should immediately reconnect when the connection dies",
+         %{ctx_info: ctx} = test_ctx do
+      monitor = make_ref()
+      msg = {:DOWN, monitor, :process, :mock_pid, :killed}
+
+      test_reconnect(test_ctx, ctx.resource_guard, fn state ->
+        state = %{state | conn_monitor: monitor}
+        @module.handle_info(msg, ctx, state)
+      end)
+
+      refute_receive :reconnect
+
+      tag = @resource_tag
+      assert_resource_guard_unregister(ctx.resource_guard, ^tag)
+    end
+
+    test "handle_info should ignore :DOWN of other processes", %{state: state, ctx_info: ctx} do
+      msg = {:DOWN, make_ref(), :process, :mock_pid, :killed}
+      assert {[], ^state} = @module.handle_info(msg, ctx, state)
+      refute_receive :reconnect
     end
   end
 
@@ -434,16 +439,11 @@ defmodule Membrane.Hackney.SourceTest do
   describe "with max_retries = 1 and is_live: true in options" do
     setup :state_resume_live
 
-    test "handle_demand should reconnect on error", %{ctx_demand: ctx_demand} = test_ctx do
-      mock(:hackney, [stream_next: 1], {:error, :reason})
-
-      test_reconnect(test_ctx, ctx_demand.resource_guard, fn state ->
-        @module.handle_demand(:output, 42, :bytes, ctx_demand, state)
+    test "handle_info :reconnect should reconnect without Range header",
+         %{ctx_info: ctx} = test_ctx do
+      test_reconnect(test_ctx, ctx.resource_guard, fn state ->
+        @module.handle_info(:reconnect, ctx, state)
       end)
-
-      # trick to overcome Mockery limitations
-      pin_response = :mock_response
-      assert_called!(:hackney, :stream_next, args: [^pin_response])
     end
 
     test "handle_info", %{state: state, ctx_info: ctx} do
