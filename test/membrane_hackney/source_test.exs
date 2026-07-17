@@ -260,6 +260,9 @@ defmodule Membrane.Hackney.SourceTest do
       assert actions == [end_of_stream: :output]
       assert new_state.async_response == nil
       assert new_state.streaming == false
+
+      tag = @resource_tag
+      assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
     test ":hackney error should return raise and close request", %{
@@ -407,7 +410,7 @@ defmodule Membrane.Hackney.SourceTest do
       refute_receive :reconnect
 
       tag = @resource_tag
-      assert_resource_guard_unregister(ctx.resource_guard, ^tag)
+      assert_resource_guard_cleanup(ctx.resource_guard, ^tag)
     end
 
     test "handle_info should ignore :DOWN of other processes", %{state: state, ctx_info: ctx} do

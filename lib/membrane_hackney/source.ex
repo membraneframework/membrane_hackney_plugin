@@ -196,9 +196,8 @@ defmodule Membrane.Hackney.Source do
     {[], %{state | streaming: false}}
   end
 
-  def handle_info({:hackney_response, id, :done}, _ctx, %{async_response: id} = state) do
-    new_state = %{demonitor_conn(state) | streaming: false, async_response: nil}
-    {[end_of_stream: :output], new_state}
+  def handle_info({:hackney_response, id, :done}, ctx, %{async_response: id} = state) do
+    {[end_of_stream: :output], close_request(ctx, state)}
   end
 
   def handle_info({:hackney_response, id, {:error, reason}}, ctx, %{async_response: id} = state) do
@@ -222,8 +221,7 @@ defmodule Membrane.Hackney.Source do
 
   def handle_info({:DOWN, monitor, :process, _pid, reason}, ctx, %{conn_monitor: monitor} = state) do
     Membrane.Logger.warning("Hackney connection process died, reason: #{inspect(reason)}")
-    Membrane.ResourceGuard.unregister(ctx.resource_guard, @resource_tag)
-    state = %{state | async_response: nil, conn_monitor: nil, streaming: false}
+    state = close_request(ctx, state)
 
     # Death of the connection process is rather caused by a library error,
     # so we retry without delay - we will either successfully reconnect
@@ -246,11 +244,11 @@ defmodule Membrane.Hackney.Source do
     raise "Error: Max retries number reached. Retry reason: #{inspect(reason)}"
   end
 
-  defp retry(_reason, ctx, state, _delay? = false) do
+  defp retry(_reason, ctx, state, false = _delay?) do
     connect(ctx, %{state | retries: state.retries + 1})
   end
 
-  defp retry(_reason, _ctx, %{retry_delay: delay, retries: retries} = state, _delay? = true) do
+  defp retry(_reason, _ctx, %{retry_delay: delay, retries: retries} = state, true = _delay?) do
     Process.send_after(self(), :reconnect, Time.as_milliseconds(delay, :round))
     {[], %{state | retries: retries + 1}}
   end
@@ -281,11 +279,16 @@ defmodule Membrane.Hackney.Source do
 
     case mockable(:hackney).request(method, location, headers, body, opts) do
       {:ok, async_response} ->
-        Membrane.ResourceGuard.register(
-          ctx.resource_guard,
-          fn -> mockable(:hackney).close(async_response) end,
-          tag: @resource_tag
-        )
+        close_conn = fn ->
+          # The connection may be dead already
+          try do
+            mockable(:hackney).close(async_response)
+          catch
+            _error -> :ok
+          end
+        end
+
+        Membrane.ResourceGuard.register(ctx.resource_guard, close_conn, tag: @resource_tag)
 
         # The connection never notifies us if it dies before delivering
         # a response message, so we need to monitor it ourselves
@@ -310,13 +313,7 @@ defmodule Membrane.Hackney.Source do
 
   defp close_request(ctx, state) do
     Membrane.ResourceGuard.cleanup(ctx.resource_guard, @resource_tag)
-    %{demonitor_conn(state) | async_response: nil, streaming: false}
-  end
-
-  defp demonitor_conn(%{conn_monitor: nil} = state), do: state
-
-  defp demonitor_conn(state) do
-    Process.demonitor(state.conn_monitor, [:flush])
-    %{state | conn_monitor: nil}
+    if state.conn_monitor, do: Process.demonitor(state.conn_monitor, [:flush])
+    %{state | async_response: nil, conn_monitor: nil, streaming: false}
   end
 end
