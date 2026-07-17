@@ -107,7 +107,7 @@ defmodule Membrane.Hackney.Source do
 
   def handle_demand(:output, _size, _unit, _ctx, state) do
     Membrane.Logger.debug_verbose("Hackney: requesting next chunk")
-    state.async_response |> mockable(:hackney).stream_next()
+    :ok = state.async_response |> mockable(:hackney).stream_next()
     {[], %{state | streaming: true}}
   end
 
